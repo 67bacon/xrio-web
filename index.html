@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>xrio companion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+/* ====================================================================
+   XRIO companion — Vape-style multi-panel
+   Glass panels, draggable, per-panel scroll, no central tab sidebar.
+   ==================================================================== */
+:root {
+  --accent:        #a78bfa;
+  --accent-deep:   #7c5cf5;
+  --accent-text:   #c4b5fd;
+  --accent-soft:   rgba(167, 139, 250, 0.14);
+  --accent-edge:   rgba(167, 139, 250, 0.42);
+  --accent-glow:   rgba(167, 139, 250, 0.55);
+
+  --bg-page:       #07070d;
+  --panel-bg:      rgba(14, 14, 22, 0.74);
+  --titlebar-a:    rgba(34, 28, 56, 0.95);
+  --titlebar-b:    rgba(18, 18, 28, 0.95);
+
+  --surface-0:     rgba(10, 10, 18, 0.60);
+  --surface-1:     rgba(22, 22, 34, 0.55);
+  --elem:          rgba(26, 26, 38, 0.55);
+  --elem-hover:    rgba(40, 40, 60, 0.70);
+  --elem-active:   rgba(50, 40, 80, 0.65);
+  --slider-bg:     rgba(10, 10, 18, 0.85);
+
+  --text:          #f4f4fb;
+  --subtext:       #a8a8bd;
+  --muted:         #6c6c84;
+  --disabled:      #45455a;
+
+  --border-hair:   rgba(255, 255, 255, 0.04);
+  --border-soft:   rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.12);
+
+  --shadow-panel:
+    0 1px 0 rgba(255,255,255,0.04) inset,
+    0 30px 60px -20px rgba(0,0,0,0.70),
+    0 8px 24px -8px rgba(0,0,0,0.55);
+  --shadow-panel-glow:
+    0 1px 0 rgba(255,255,255,0.06) inset,
+    0 30px 60px -20px rgba(0,0,0,0.70),
+    0 0 0 1px var(--accent-edge),
+    0 0 32px -8px var(--accent-glow);
+
+  --ease:    cubic-bezier(0.22, 1, 0.36, 1);
+  --t-fast:  120ms var(--ease);
+  --t-base:  200ms var(--ease);
+  --t-slow:  320ms var(--ease);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: 'Geist', system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--text);
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 0%,  rgba(124,92,245,0.14), transparent 70%),
+    radial-gradient(ellipse 70% 50% at 100% 100%, rgba(34,211,238,0.06),  transparent 70%),
+    radial-gradient(ellipse 60% 40% at 0% 100%, rgba(244,63,94,0.04),    transparent 70%),
+    var(--bg-page);
+  min-height: 100vh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── status bar (top) ── */
+.statusbar {
+  position: fixed;
+  top: 14px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 14px 7px 12px;
+  background: rgba(14, 14, 22, 0.78);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  border-radius: 999px;
+  border: 1px solid var(--border-soft);
+  font-size: 11px;
+  color: var(--subtext);
+  letter-spacing: 0.04em;
+  box-shadow: 0 8px 32px -8px rgba(0,0,0,0.5);
+  font-feature-settings: 'tnum';
+}
+.dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #ff5e5e;
+  box-shadow: 0 0 8px #ff5e5e, 0 0 16px rgba(255,94,94,0.4);
+  transition: all var(--t-base);
+}
+.dot.live {
+  background: #4ade80;
+  box-shadow: 0 0 8px #4ade80, 0 0 16px rgba(74,222,128,0.4);
+}
+.dot.pulse { animation: dotPulse 1.6s ease-in-out infinite; }
+@keyframes dotPulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.85); } }
+
+.brand {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  color: var(--muted);
+  border-left: 1px solid var(--border-soft);
+  padding-left: 10px;
+  margin-left: 4px;
+}
+.brand .accent { color: var(--accent-text); }
+
+/* ── panels root ── */
+.panels-root {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* ── individual panel ── */
+.panel {
+  position: absolute;
+  width: 280px;
+  pointer-events: auto;
+  background: var(--panel-bg);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  box-shadow: var(--shadow-panel);
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 80px);
+  transition: box-shadow var(--t-base);
+  opacity: 0;
+  transform: translateY(8px);
+  animation: panelIn 0.55s var(--ease) forwards;
+  will-change: transform;
+}
+@keyframes panelIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+.panel:hover,
+.panel.dragging { box-shadow: var(--shadow-panel-glow); }
+.panel.dragging { transition: none; cursor: grabbing; }
+/* Reduce GPU load during drag: kill shine sweep + pulse + backdrop blur */
+.panel.dragging .ctrl-row::before,
+.panel.dragging .toggle.on .toggle__stripe { animation: none !important; }
+.panel.dragging { backdrop-filter: blur(8px) saturate(120%); -webkit-backdrop-filter: blur(8px) saturate(120%); }
+
+/* faint top highlight (like Discord/Steam panels) */
+.panel::before {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0) 35%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ── titlebar ── */
+.panel-title {
+  position: relative;
+  height: 36px;
+  background: linear-gradient(180deg, var(--titlebar-a) 0%, var(--titlebar-b) 100%);
+  display: flex; align-items: center;
+  padding: 0 14px;
+  gap: 10px;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  border-bottom: 1px solid var(--border-hair);
+  border-radius: 14px 14px 0 0;
+  cursor: grab;
+  user-select: none;
+}
+.panel.dragging .panel-title { cursor: grabbing; }
+.panel-title__dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+  flex-shrink: 0;
+}
+.panel-title__name { flex: 1; }
+.panel-title__count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+  background: rgba(255,255,255,0.04);
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.02em;
+}
+
+/* ── panel body (scrollable) ── */
+.panel-body {
+  padding: 8px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(167,139,250,0.25) transparent;
+}
+.panel-body::-webkit-scrollbar { width: 6px; }
+.panel-body::-webkit-scrollbar-thumb { background: rgba(167,139,250,0.25); border-radius: 3px; }
+.panel-body::-webkit-scrollbar-thumb:hover { background: rgba(167,139,250,0.45); }
+.panel-body::-webkit-scrollbar-track { background: transparent; }
+
+/* ── section divider ── */
+.section-divider {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 10px 6px 4px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  transition: all var(--t-base);
+}
+.section-divider:first-child { margin-top: 4px; }
+.section-divider:hover { background: var(--elem-hover); color: var(--accent-text); }
+.section-divider.open { color: var(--accent-text); }
+.section-divider__chev {
+  width: 10px; height: 10px;
+  display: grid; place-items: center;
+  transition: transform var(--t-base);
+  flex-shrink: 0;
+}
+.section-divider.open .section-divider__chev { transform: rotate(90deg); }
+.section-divider__count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--muted);
+  margin-left: 4px;
+}
+.section-divider__line {
+  flex: 1; height: 1px;
+  background: linear-gradient(90deg, var(--border-soft), transparent);
+}
+.section-body {
+  overflow: hidden;
+  max-height: 0;
+  /* JS sets explicit pixel max-height for precise animation timing */
+  transition: max-height 0.30s var(--ease), opacity 0.22s var(--ease);
+  opacity: 0;
+  will-change: max-height;
+}
+.section-body.open { opacity: 1; }
+
+/* ── shared row base ── */
+.ctrl-row {
+  position: relative;
+  display: flex; align-items: center;
+  min-height: 30px;
+  padding: 0 12px 0 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  user-select: none;
+  overflow: hidden;
+  color: var(--text);
+  transition: background var(--t-base);
+}
+.ctrl-row:not(:last-child) { margin-bottom: 2px; }
+.ctrl-row__name {
+  flex: 1;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* hover gradient sweep (animated shine) */
+.ctrl-row::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(167,139,250,0.08) 50%, transparent 100%);
+  transform: translateX(-110%);
+  transition: transform 0.45s var(--ease);
+  pointer-events: none;
+}
+.ctrl-row:hover::before { transform: translateX(110%); }
+.ctrl-row:hover { background: var(--elem-hover); }
+
+/* active toggle row */
+.toggle.on {
+  background: linear-gradient(
+    90deg,
+    rgba(167,139,250,0.16) 0%,
+    rgba(167,139,250,0.04) 60%,
+    transparent 100%
+  );
+}
+.toggle.on:hover { background: linear-gradient(90deg, rgba(167,139,250,0.22), rgba(167,139,250,0.06) 70%, transparent); }
+
+/* left accent stripe (only ON state) */
+.toggle__stripe {
+  position: absolute;
+  left: 0; top: 7px; bottom: 7px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: linear-gradient(180deg, var(--accent-text) 0%, var(--accent) 50%, var(--accent-deep) 100%);
+  box-shadow: 0 0 6px var(--accent-glow);
+  opacity: 0;
+  transition: opacity var(--t-base);
+}
+.toggle.on .toggle__stripe {
+  opacity: 1;
+  /* CSS animation lives on `.toggle.on .toggle__stripe` selector.
+     Because we toggle the `.on` class IN PLACE (no DOM rebuild),
+     the animation only restarts on the specific row that flipped,
+     not every row in the panel — which fixes the cascade bug. */
+  animation: stripePulse 1.8s ease-in-out infinite;
+}
+@keyframes stripePulse {
+  0%, 100% { opacity: 1;    box-shadow: 0 0 6px  var(--accent-glow); }
+  50%      { opacity: 0.55; box-shadow: 0 0 12px var(--accent-glow); }
+}
+
+/* ── pill switch ── */
+.toggle__pill {
+  position: relative;
+  width: 30px; height: 16px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-soft);
+  flex-shrink: 0;
+  transition: background var(--t-base), border-color var(--t-base), box-shadow var(--t-base);
+}
+.toggle__pill::after {
+  content: '';
+  position: absolute;
+  top: 1px; left: 1px;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: #e4e4ef;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+  transition: transform var(--t-base), background var(--t-base);
+}
+.toggle.on .toggle__pill {
+  background: linear-gradient(135deg, var(--accent-text), var(--accent) 55%, var(--accent-deep));
+  border-color: var(--accent-edge);
+  box-shadow: 0 0 0 1px var(--accent-edge), 0 0 10px var(--accent-glow);
+}
+.toggle.on .toggle__pill::after {
+  background: #fff;
+  transform: translateX(14px);
+  box-shadow: 0 0 4px rgba(255,255,255,0.5), 0 1px 2px rgba(0,0,0,0.4);
+}
+
+/* ── slider row (inline single-row) ── */
+.slider {
+  min-height: 32px;
+  cursor: default;
+  gap: 10px;
+}
+.slider .ctrl-row__name {
+  flex: 0 0 auto;
+  max-width: 90px;
+}
+.slider__track {
+  position: relative;
+  flex: 1;
+  height: 6px;
+  background: var(--slider-bg);
+  border-radius: 3px;
+  cursor: pointer;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.5);
+}
+.slider__fill {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  background: linear-gradient(90deg, var(--accent-deep), var(--accent));
+  border-radius: 3px;
+  box-shadow: 0 0 6px var(--accent-glow);
+  pointer-events: none;
+  /* default: smooth WS-echoed updates */
+  transition: width 0.16s var(--ease);
+  will-change: width;
+}
+.slider.dragging .slider__fill { transition: none; }  /* instant during drag */
+.slider__thumb {
+  position: absolute;
+  top: 50%;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--accent);
+  transform: translate(-50%, -50%);
+  box-shadow:
+    0 0 0 4px rgba(167, 139, 250, 0.18),
+    0 0 12px var(--accent-glow),
+    0 1px 3px rgba(0,0,0,0.5);
+  pointer-events: none;
+  transition: left 0.16s var(--ease), width var(--t-base), height var(--t-base), box-shadow var(--t-base);
+  will-change: left, width;
+}
+.slider.dragging .slider__thumb { transition: width var(--t-base), height var(--t-base); }
+.slider__val {
+  transition: color var(--t-base), background var(--t-base);
+}
+.slider.dragging .slider__val {
+  color: #fff;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+.slider:hover .slider__thumb,
+.slider.dragging .slider__thumb {
+  width: 14px; height: 14px;
+  box-shadow:
+    0 0 0 5px rgba(167, 139, 250, 0.28),
+    0 0 16px var(--accent-glow),
+    0 1px 3px rgba(0,0,0,0.5);
+}
+.slider__val {
+  flex: 0 0 auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--accent-text);
+  background: var(--accent-soft);
+  padding: 3px 8px;
+  border-radius: 5px;
+  letter-spacing: 0.02em;
+  min-width: 44px;
+  text-align: center;
+}
+
+/* ── keybind row ── */
+.keybind .ctrl-row__name { flex: 1; }
+.keybind__chip {
+  position: relative;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--accent-text);
+  background: var(--slider-bg);
+  padding: 4px 10px;
+  border-radius: 5px;
+  border: 1px solid var(--border-strong);
+  min-width: 48px;
+  text-align: center;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  user-select: none;
+  box-shadow:
+    inset 0 -2px 0 rgba(0,0,0,0.4),
+    0 1px 0 rgba(255,255,255,0.04);
+  transition: all var(--t-base);
+}
+.keybind:hover .keybind__chip { border-color: var(--accent-edge); color: var(--accent-text); }
+.keybind__chip.listening {
+  background: var(--accent-soft);
+  border-color: var(--accent-edge);
+  animation: keyPulse 0.85s ease-in-out infinite alternate;
+}
+@keyframes keyPulse {
+  from { box-shadow: 0 0 0 0 var(--accent-glow), inset 0 -2px 0 rgba(0,0,0,0.4); }
+  to   { box-shadow: 0 0 0 4px var(--accent-soft), 0 0 16px var(--accent-glow), inset 0 -2px 0 rgba(0,0,0,0.4); }
+}
+
+/* ── dropdown row ── */
+.dropdown { padding-right: 8px; }
+.dropdown__value {
+  font-size: 11px;
+  color: var(--accent-text);
+  margin-right: 6px;
+  max-width: 100px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dropdown__chev {
+  width: 14px; height: 14px;
+  display: grid; place-items: center;
+  color: var(--muted);
+  transition: transform var(--t-base), color var(--t-base);
+}
+.dropdown.open .dropdown__chev { transform: rotate(180deg); color: var(--accent-text); }
+.dropdown:hover .dropdown__chev { color: var(--accent-text); }
+.dropdown__menu {
+  margin: 2px 0 6px 0;
+  padding: 4px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  display: none;
+  flex-direction: column;
+  gap: 1px;
+  animation: ddIn 0.22s var(--ease);
+}
+@keyframes ddIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+.dropdown.open + .dropdown__menu { display: flex; }
+.dropdown__opt {
+  padding: 6px 10px;
+  font-size: 11px;
+  color: var(--subtext);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all var(--t-base);
+  display: flex; align-items: center; gap: 8px;
+}
+.dropdown__opt:hover { background: var(--elem-hover); color: var(--text); }
+.dropdown__opt.selected {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.dropdown__opt.selected::before {
+  content: '';
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
+}
+
+/* ── empty state ── */
+.empty-state {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 32px 40px;
+  background: var(--panel-bg);
+  backdrop-filter: blur(22px) saturate(150%);
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  box-shadow: var(--shadow-panel);
+}
+.empty-state__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+  letter-spacing: -0.01em;
+}
+.empty-state__hint {
+  display: block;
+  margin-top: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--accent-text);
+  letter-spacing: 0.03em;
+}
+.empty-state__spinner {
+  width: 24px; height: 24px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent);
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="statusbar">
+  <div id="dot" class="dot pulse"></div>
+  <span id="status-text">connecting to broker…</span>
+  <span class="brand">XRIO <span class="accent">v1</span></span>
+</div>
+
+<div class="panels-root" id="panels-root"></div>
+
+<script>
+/* ==========================================================================
+   STATE — minimal, all WebSocket logic preserved from original.
+   ========================================================================== */
+const WS_URL = `ws://${location.host}/`;
+let   ws = null;
+let   schema = [];
+let   flags = {};
+let   luaConnected = false;
+let   schemaSig = '';   // signature of last-built schema; rebuild only when this changes
+
+/* Per-control update functions, keyed by flag.
+   When a flag value arrives (from WS or local interaction), we call its
+   update fn IN PLACE — no full DOM rebuild. This fixes:
+     (a) slider drag (thumb no longer destroyed mid-drag)
+     (b) stripe cascade pulse (only the toggled row's animation restarts) */
+const controlRefs = new Map(); // flag -> (value) => void
+
+/* Track which flag the user is currently dragging — incoming WS updates for
+   that flag are ignored so the drag doesn't jump. */
+let draggingFlag = null;
+
+/* Send throttling for slider drag (don't flood Lua). */
+let lastSendByFlag = new Map();
+const SEND_THROTTLE_MS = 40;
+
+/* ==========================================================================
+   STATUS
+   ========================================================================== */
+function setStatus(brokerConnected, lua) {
+  const dot = document.getElementById('dot');
+  const txt = document.getElementById('status-text');
+  if (!brokerConnected) {
+    dot.className = 'dot pulse';
+    txt.textContent = 'reconnecting to broker…';
+  } else if (!lua) {
+    dot.className = 'dot pulse';
+    txt.textContent = 'broker ok · waiting for Lua';
+  } else {
+    dot.className = 'dot live';
+    txt.textContent = 'live · Lua connected';
+  }
+}
+
+/* ==========================================================================
+   WEBSOCKET — same protocol as before
+   ========================================================================== */
+function connect() {
+  // Tolerate hostile contexts (e.g. previewed over https):
+  //   - WebSocket(ws://...) on an https page throws SecurityError.
+  //   - In production this is loaded from a local http://localhost server,
+  //     so `ws://` is fine. In a preview, just stay in the empty state.
+  try {
+    ws = new WebSocket(WS_URL);
+  } catch (err) {
+    setStatus(false, false);
+    setTimeout(connect, 2000);
+    return;
+  }
+  ws.onopen = () => {
+    setStatus(true, luaConnected);
+    ws.send(JSON.stringify({ type: 'hello', role: 'ui' }));
+  };
+  ws.onclose = () => { setStatus(false, false); setTimeout(connect, 1000); };
+  ws.onerror = () => {};
+  ws.onmessage = (ev) => {
+    let msg;
+    try { msg = JSON.parse(ev.data); } catch { return; }
+
+    if (msg.type === 'init') {
+      luaConnected = !!msg.lua_connected;
+      schema = msg.schema || [];
+      flags  = msg.flags  || {};
+      setStatus(true, luaConnected);
+      rebuildIfSchemaChanged();
+      applyAllFlags();
+    } else if (msg.type === 'lua_connected') {
+      luaConnected = true;
+      schema = msg.schema || schema;
+      flags  = msg.flags  || flags;
+      setStatus(true, true);
+      rebuildIfSchemaChanged();
+      applyAllFlags();
+    } else if (msg.type === 'lua_disconnected') {
+      luaConnected = false;
+      setStatus(true, false);
+      showEmpty();
+    } else if (msg.type === 'flag') {
+      flags[msg.flag] = msg.value;
+      if (msg.flag !== draggingFlag) {
+        const fn = controlRefs.get(msg.flag);
+        if (fn) fn(msg.value);
+      }
+    }
+  };
+}
+
+function send(payload) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(payload));
+  }
+}
+function sendThrottled(flag, value) {
+  const now = performance.now();
+  if (!lastSendByFlag.has(flag) || now - lastSendByFlag.get(flag) > SEND_THROTTLE_MS) {
+    lastSendByFlag.set(flag, now);
+    send({ type: 'set_flag', flag, value });
+  }
+}
+
+/* ==========================================================================
+   DOM helpers
+   ========================================================================== */
+function el(tag, cls, txt) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (txt !== undefined) n.textContent = txt;
+  return n;
+}
+
+/* ==========================================================================
+   PANEL DRAG — header drag, position persists in localStorage
+   ========================================================================== */
+function panelPositionKey(tab) { return 'xrio.panelpos.' + tab; }
+
+function makeDraggable(panel, header, tab) {
+  let dx = 0, dy = 0, sx = 0, sy = 0, dragging = false;
+  let zCounter = 10;
+  const onMove = (ev) => {
+    if (!dragging) return;
+    const x = ev.clientX - dx;
+    const y = ev.clientY - dy;
+    // HARD AIR WALLS — entire panel must stay fully on screen.
+    // No edge can leave the viewport. Bottom wall same as right/left.
+    const pw = panel.offsetWidth, ph = panel.offsetHeight;
+    const minLeft = 0;
+    const maxLeft = Math.max(0, window.innerWidth  - pw);
+    const minTop  = 48;                                   // below statusbar
+    const maxTop  = Math.max(48, window.innerHeight - ph - 8);  // 8px bottom gap
+    panel.style.left = Math.max(minLeft, Math.min(maxLeft, x)) + 'px';
+    panel.style.top  = Math.max(minTop,  Math.min(maxTop,  y)) + 'px';
+  };
+  const onUp = () => {
+    if (!dragging) return;
+    dragging = false;
+    panel.classList.remove('dragging');
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    try {
+      localStorage.setItem(panelPositionKey(tab), JSON.stringify({
+        left: panel.offsetLeft, top: panel.offsetTop,
+      }));
+    } catch {}
+  };
+  header.addEventListener('mousedown', (ev) => {
+    if (ev.button !== 0) return;
+    dragging = true;
+    sx = ev.clientX; sy = ev.clientY;
+    dx = ev.clientX - panel.offsetLeft;
+    dy = ev.clientY - panel.offsetTop;
+    panel.style.zIndex = String(++zCounter + 50);
+    panel.classList.add('dragging');
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    ev.preventDefault();
+  });
+}
+
+/* Initial layout for 5 panels: pack into rows that fit viewport. */
+function initialLayout(count, panelW = 280, gap = 16) {
+  const colsTry = Math.max(1, Math.floor((window.innerWidth - 2 * gap) / (panelW + gap)));
+  const cols = Math.min(count, colsTry);
+  const rows = Math.ceil(count / cols);
+  const totalW = cols * panelW + (cols - 1) * gap;
+  const startX = Math.max(gap, (window.innerWidth - totalW) / 2);
+  const startY = 64; // below the statusbar
+  const rowGap = 24;
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    const c = i % cols;
+    const r = Math.floor(i / cols);
+    out.push({
+      left: Math.round(startX + c * (panelW + gap)),
+      top:  Math.round(startY + r * (400 + rowGap)),  // 400 = approximate panel height
+    });
+  }
+  return out;
+}
+
+/* ==========================================================================
+   CONTROL BUILDERS — each returns {el, update}.
+   `update(value)` mutates the row IN PLACE; no DOM recreation.
+   ========================================================================== */
+function buildToggle(ctrl) {
+  const row    = el('div', 'ctrl-row toggle');
+  const stripe = el('div', 'toggle__stripe');
+  const name   = el('div', 'ctrl-row__name', ctrl.name);
+  const pill   = el('div', 'toggle__pill');
+  row.appendChild(stripe);
+  row.appendChild(name);
+  row.appendChild(pill);
+
+  const update = (v) => {
+    row.classList.toggle('on', !!v);
+  };
+
+  row.addEventListener('click', () => {
+    const next = !flags[ctrl.flag];
+    flags[ctrl.flag] = next;
+    update(next);
+    send({ type: 'set_flag', flag: ctrl.flag, value: next });
+  });
+
+  return { el: row, update };
+}
+
+function buildSlider(ctrl) {
+  const min  = (typeof ctrl.min === 'number') ? ctrl.min : 0;
+  const max  = (typeof ctrl.max === 'number') ? ctrl.max : 100;
+  const step = (typeof ctrl.step === 'number') ? ctrl.step : (max - min >= 100 ? 1 : 0.01);
+  const suffix = ctrl.suffix || '';
+
+  const row   = el('div', 'ctrl-row slider');
+  const name  = el('div', 'ctrl-row__name', ctrl.name);
+  const track = el('div', 'slider__track');
+  const fill  = el('div', 'slider__fill');
+  const thumb = el('div', 'slider__thumb');
+  const val   = el('div', 'slider__val');
+  track.appendChild(fill);
+  track.appendChild(thumb);
+  row.appendChild(name);
+  row.appendChild(track);
+  row.appendChild(val);
+
+  const format = (v) => {
+    if (ctrl.format) return ctrl.format.replace('{}', v);
+    if (step >= 1) return Math.round(v) + suffix;
+    const dec = Math.max(0, Math.ceil(-Math.log10(step)));
+    return v.toFixed(dec) + suffix;
+  };
+
+  const update = (v) => {
+    const clamped = Math.max(min, Math.min(max, v));
+    const pct = (max > min) ? ((clamped - min) / (max - min)) * 100 : 0;
+    fill.style.width = pct + '%';
+    thumb.style.left = pct + '%';
+    val.textContent = format(clamped);
+  };
+
+  const valueAt = (clientX) => {
+    const r = track.getBoundingClientRect();
+    let p = (clientX - r.left) / r.width;
+    p = Math.max(0, Math.min(1, p));
+    let v = min + p * (max - min);
+    if (step) v = Math.round(v / step) * step;
+    // Float guard
+    v = Math.max(min, Math.min(max, v));
+    return v;
+  };
+
+  const onMove = (ev) => {
+    const v = valueAt(ev.clientX);
+    flags[ctrl.flag] = v;
+    update(v);
+    sendThrottled(ctrl.flag, v);
+  };
+  const onUp = (ev) => {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    row.classList.remove('dragging');
+    const v = valueAt(ev.clientX);
+    flags[ctrl.flag] = v;
+    update(v);
+    send({ type: 'set_flag', flag: ctrl.flag, value: v }); // final commit, unthrottled
+    draggingFlag = null;
+  };
+
+  track.addEventListener('mousedown', (ev) => {
+    if (ev.button !== 0) return;
+    draggingFlag = ctrl.flag;
+    row.classList.add('dragging');
+    onMove(ev);  // jump-to-click on initial press
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    ev.preventDefault();
+  });
+
+  return { el: row, update };
+}
+
+function buildKeybind(ctrl) {
+  const row  = el('div', 'ctrl-row keybind');
+  const name = el('div', 'ctrl-row__name', ctrl.name);
+  const chip = el('div', 'keybind__chip', ctrl.default || 'None');
+  row.appendChild(name);
+  row.appendChild(chip);
+
+  const update = (v) => { chip.textContent = v || 'None'; };
+
+  let listening = false;
+  let keyHandler = null;
+  const stopListening = () => {
+    listening = false;
+    chip.classList.remove('listening');
+    if (keyHandler) {
+      window.removeEventListener('keydown', keyHandler);
+      keyHandler = null;
+    }
+  };
+
+  chip.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    if (listening) { stopListening(); return; }
+    listening = true;
+    chip.textContent = '…';
+    chip.classList.add('listening');
+    keyHandler = (e) => {
+      if (!listening) return;
+      e.preventDefault();
+      const key = e.key.length === 1 ? e.key.toUpperCase() : e.key;
+      flags[ctrl.flag] = key;
+      update(key);
+      stopListening();
+      send({ type: 'set_flag', flag: ctrl.flag, value: key });
+    };
+    window.addEventListener('keydown', keyHandler);
+  });
+
+  return { el: row, update };
+}
+
+function buildDropdown(ctrl) {
+  const wrap = el('div');
+  const row  = el('div', 'ctrl-row dropdown');
+  const name = el('div', 'ctrl-row__name', ctrl.name);
+  const val  = el('div', 'dropdown__value', '');
+  const chev = el('div', 'dropdown__chev');
+  chev.innerHTML = '<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+  row.appendChild(name); row.appendChild(val); row.appendChild(chev);
+
+  const menu = el('div', 'dropdown__menu');
+  const options = ctrl.options || [];
+  const optEls = options.map(o => {
+    const o2 = el('div', 'dropdown__opt', o);
+    o2.dataset.value = o;
+    menu.appendChild(o2);
+    return o2;
+  });
+
+  wrap.appendChild(row);
+  wrap.appendChild(menu);
+
+  const update = (v) => {
+    val.textContent = (v == null) ? '' : String(v);
+    optEls.forEach((e) => e.classList.toggle('selected', e.dataset.value === v));
+  };
+
+  row.addEventListener('click', () => {
+    const open = row.classList.toggle('open');
+    if (open) {
+      menu.style.display = 'flex';
+      // close on outside click
+      const onDoc = (ev) => {
+        if (!wrap.contains(ev.target)) {
+          row.classList.remove('open');
+          menu.style.display = 'none';
+          document.removeEventListener('mousedown', onDoc);
+        }
+      };
+      setTimeout(() => document.addEventListener('mousedown', onDoc), 0);
+    } else {
+      menu.style.display = 'none';
+    }
+  });
+
+  optEls.forEach((e) => {
+    e.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const v = e.dataset.value;
+      flags[ctrl.flag] = v;
+      update(v);
+      send({ type: 'set_flag', flag: ctrl.flag, value: v });
+      row.classList.remove('open');
+      menu.style.display = 'none';
+    });
+  });
+
+  return { el: wrap, update };
+}
+
+const BUILDERS = {
+  toggle:   buildToggle,
+  slider:   buildSlider,
+  keybind:  buildKeybind,
+  dropdown: buildDropdown,
+};
+
+/* ==========================================================================
+   PANEL ASSEMBLY
+   ========================================================================== */
+
+function groupBySection(controls) {
+  const out = [];
+  const seen = new Map();  // section -> array index
+  for (const c of controls) {
+    const sec = c.section || 'MAIN';
+    let idx = seen.get(sec);
+    if (idx == null) { idx = out.length; out.push({ section: sec, items: [] }); seen.set(sec, idx); }
+    out[idx].items.push(c);
+  }
+  return out;
+}
+
+function buildPanel(tab, controls, index, total) {
+  const panel = el('div', 'panel');
+  panel.dataset.tab = tab;
+  panel.style.animationDelay = (index * 70) + 'ms';
+
+  const title = el('div', 'panel-title');
+  const dot   = el('div', 'panel-title__dot');
+  const tname = el('div', 'panel-title__name', tab);
+  const count = el('div', 'panel-title__count', String(controls.length));
+  title.appendChild(dot); title.appendChild(tname); title.appendChild(count);
+
+  const body = el('div', 'panel-body');
+
+  const grouped = groupBySection(controls);
+  const sectionRefs = [];   // {divider, body} pairs for auto-collapse logic
+
+  grouped.forEach((g, idx) => {
+    const sectionName = (g.section && g.section !== 'MAIN') ? g.section : null;
+    let divider, secBody;
+
+    if (sectionName) {
+      divider = el('div', 'section-divider');
+      const chev = el('div', 'section-divider__chev');
+      chev.innerHTML = '<svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M2.5 1L5.5 4L2.5 7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      divider.appendChild(chev);
+      divider.appendChild(el('span', null, sectionName));
+      divider.appendChild(el('span', 'section-divider__count', String(g.items.length)));
+      divider.appendChild(el('span', 'section-divider__line'));
+      body.appendChild(divider);
+    }
+
+    secBody = el('div', sectionName ? 'section-body' : '');
+    body.appendChild(secBody);
+
+    for (const c of g.items) {
+      const builder = BUILDERS[c.type];
+      if (!builder) continue;
+      const { el: row, update } = builder(c);
+      secBody.appendChild(row);
+      controlRefs.set(c.flag, update);
+    }
+
+    if (sectionName) {
+      sectionRefs.push({ divider, secBody, name: sectionName });
+      // (initial open of first section handled below via openSection so the
+      // animation timing matches click-to-open)
+    } else {
+      // unnamed/MAIN section is always visible (no toggle)
+      secBody.style.maxHeight = 'none';
+      secBody.style.opacity = '1';
+    }
+  });
+
+  // Animated open/close using measured scrollHeight (smooth precise timing)
+  const openSection = (s) => {
+    s.divider.classList.add('open');
+    s.secBody.classList.add('open');
+    const h = s.secBody.scrollHeight;
+    s.secBody.style.maxHeight = h + 'px';
+    // After transition completes, remove px constraint so content can grow
+    clearTimeout(s._cleanup);
+    s._cleanup = setTimeout(() => {
+      if (s.divider.classList.contains('open')) s.secBody.style.maxHeight = 'none';
+    }, 320);
+  };
+  const closeSection = (s) => {
+    // Lock current pixel height so transition has a from-value, then collapse next frame
+    s.secBody.style.maxHeight = s.secBody.scrollHeight + 'px';
+    requestAnimationFrame(() => {
+      s.divider.classList.remove('open');
+      s.secBody.classList.remove('open');
+      s.secBody.style.maxHeight = '0px';
+      clearTimeout(s._cleanup);
+    });
+  };
+
+  // Initial: open first section
+  if (sectionRefs.length > 0) {
+    // Defer one frame so scrollHeight is correct after DOM insert
+    requestAnimationFrame(() => openSection(sectionRefs[0]));
+  }
+
+  // Click to expand/collapse + auto-close siblings if total would overflow viewport
+  const VIEWPORT_BUDGET = () => window.innerHeight - 120;
+  const estimateOpenHeight = (forceOpen) => {
+    let h = 50; // titlebar + padding
+    for (const s of sectionRefs) {
+      h += 32; // section header
+      const isOpen = s === forceOpen ? true : s.divider.classList.contains('open');
+      if (isOpen) h += s.secBody.scrollHeight || s.secBody.children.length * 32;
+    }
+    return h;
+  };
+  sectionRefs.forEach((s) => {
+    s.divider.addEventListener('click', () => {
+      if (s.divider.classList.contains('open')) {
+        closeSection(s);
+        return;
+      }
+      // Close other open sections if this one would overflow
+      if (estimateOpenHeight(s) > VIEWPORT_BUDGET()) {
+        for (const other of sectionRefs) {
+          if (other === s) continue;
+          if (other.divider.classList.contains('open')) {
+            closeSection(other);
+            if (estimateOpenHeight(s) <= VIEWPORT_BUDGET()) break;
+          }
+        }
+      }
+      openSection(s);
+    });
+  });
+
+  panel.appendChild(title);
+  panel.appendChild(body);
+  makeDraggable(panel, title, tab);
+  return panel;
+}
+
+function rebuildIfSchemaChanged() {
+  const root = document.getElementById('panels-root');
+  // Remove empty state if present
+  const existingEmpty = document.querySelector('.empty-state');
+  if (existingEmpty) existingEmpty.remove();
+
+  if (!luaConnected || schema.length === 0) {
+    showEmpty();
+    return;
+  }
+
+  // Compute a signature; only rebuild when the schema *shape* changes.
+  const sig = schema.map(c => `${c.tab}|${c.section || ''}|${c.flag}|${c.type}`).join('||');
+  if (sig === schemaSig && root.children.length > 0) return;
+  schemaSig = sig;
+
+  // Wipe
+  root.innerHTML = '';
+  controlRefs.clear();
+
+  // Group by tab in insertion order
+  const tabs = [];
+  const tabMap = new Map();
+  for (const c of schema) {
+    const t = c.tab || 'Main';
+    if (!tabMap.has(t)) { tabMap.set(t, []); tabs.push(t); }
+    tabMap.get(t).push(c);
+  }
+
+  const positions = initialLayout(tabs.length);
+
+  tabs.forEach((t, i) => {
+    const panel = buildPanel(t, tabMap.get(t), i, tabs.length);
+    // saved position takes priority over initial layout
+    let pos = positions[i];
+    try {
+      const saved = localStorage.getItem(panelPositionKey(t));
+      if (saved) pos = JSON.parse(saved);
+    } catch {}
+    panel.style.left = pos.left + 'px';
+    panel.style.top  = pos.top  + 'px';
+    root.appendChild(panel);
+  });
+}
+
+/* Push current `flags` into every control once after a rebuild. */
+function applyAllFlags() {
+  for (const [flag, fn] of controlRefs.entries()) {
+    if (flags[flag] !== undefined) fn(flags[flag]);
+  }
+}
+
+function showEmpty() {
+  const root = document.getElementById('panels-root');
+  root.innerHTML = '';
+  controlRefs.clear();
+  schemaSig = '';
+
+  if (document.querySelector('.empty-state')) return;
+  const e = el('div', 'empty-state');
+  e.appendChild(el('div', 'empty-state__spinner'));
+  e.appendChild(el('div', 'empty-state__title', luaConnected ? 'Connected · waiting for schema' : 'Lua side not connected'));
+  e.appendChild(el('div', null, luaConnected ? 'The Lua client is online but hasn\u2019t pushed its schema yet.' : 'Inject xrio into Roblox and the panels will appear here.'));
+  e.appendChild(el('span', 'empty-state__hint', 'ws://' + location.host + '/'));
+  document.body.appendChild(e);
+}
+
+/* ==========================================================================
+   INIT
+   ========================================================================== */
+showEmpty();
+connect();
+
+/* Re-layout panels that never had saved positions when the viewport size changes
+   (the user's first interaction usually anchors them; this only repositions
+   panels that haven't moved). */
+window.addEventListener('resize', () => {
+  const root = document.getElementById('panels-root');
+  const panels = root.querySelectorAll('.panel');
+  const positions = initialLayout(panels.length);
+  panels.forEach((p, i) => {
+    if (!localStorage.getItem(panelPositionKey(p.dataset.tab))) {
+      p.style.left = positions[i].left + 'px';
+      p.style.top  = positions[i].top  + 'px';
+    }
+  });
+});
+</script>
+</body>
+</html>
