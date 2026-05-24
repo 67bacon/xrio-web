@@ -14,6 +14,8 @@ if key == "" then
     warn("[xrio] no key. Get one from the xrio dashboard and paste the full one-liner.")
     return
 end
+-- script.lua reads _G._XRIO_COMPANION_KEY for WebSocket auth; mirror the same key.
+_G._XRIO_COMPANION_KEY = key
 
 -- Cache-busted GET via request() (executor's HTTP can't reach localhost but reaches tunnels fine)
 local req = request or http_request or (syn and syn.request)
