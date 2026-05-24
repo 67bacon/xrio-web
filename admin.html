@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>xrio · admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --accent:#a78bfa; --accent-deep:#7c5cf5; --accent-text:#c4b5fd;
+  --accent-soft:rgba(167,139,250,0.14); --accent-edge:rgba(167,139,250,0.42); --accent-glow:rgba(167,139,250,0.55);
+  --bg:#07070d; --panel:rgba(14,14,22,0.78);
+  --surface:rgba(22,22,34,0.78); --elem:rgba(26,26,38,0.55); --elem-hover:rgba(40,40,60,0.7);
+  --text:#f4f4fb; --subtext:#a8a8bd; --muted:#6c6c84;
+  --border:rgba(255,255,255,0.08); --border-strong:rgba(255,255,255,0.13);
+  --red:#ef4444; --green:#4ade80; --yellow:#f59e0b;
+  --ease:cubic-bezier(0.22,1,0.36,1);
+}
+* { box-sizing:border-box; }
+html, body { margin:0; padding:0; }
+body {
+  font-family:'Geist',system-ui,sans-serif;
+  font-size:13px; color:var(--text);
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 0%, rgba(124,92,245,0.14), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 100% 100%, rgba(34,211,238,0.05), transparent 70%),
+    var(--bg);
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+.app {
+  max-width:920px; margin:0 auto; padding:40px 24px 80px;
+}
+header {
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:28px;
+}
+.brand {
+  font-size:11px; font-weight:700; letter-spacing:0.32em; color:var(--accent-text);
+  text-transform:uppercase;
+}
+.title {
+  font-size:24px; font-weight:600; margin-top:4px;
+  letter-spacing:-0.02em;
+}
+.stats {
+  display:flex; gap:14px; margin-bottom:24px; flex-wrap:wrap;
+}
+.stat {
+  flex:1; min-width:160px;
+  padding:14px 18px;
+  background:var(--surface); border:1px solid var(--border); border-radius:12px;
+  backdrop-filter:blur(16px);
+}
+.stat__label { font-size:10px; color:var(--muted); letter-spacing:0.16em; text-transform:uppercase; }
+.stat__val   { font-size:22px; font-weight:600; margin-top:4px; font-family:'JetBrains Mono',monospace; }
+
+.toolbar {
+  display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap; align-items:center;
+}
+.toolbar input[type=text], .toolbar input[type=number] {
+  flex:1; min-width:160px;
+  padding:9px 13px;
+  background:var(--elem); border:1px solid var(--border);
+  border-radius:9px; color:var(--text);
+  font-family:inherit; font-size:12px;
+  outline:none; transition:border-color .2s var(--ease);
+}
+.toolbar input[type=number] { flex:0 0 110px; }
+.toolbar input:focus { border-color:var(--accent-edge); }
+.toolbar input::placeholder { color:var(--muted); }
+.btn {
+  padding:9px 16px;
+  background:var(--elem); color:var(--text);
+  border:1px solid var(--border); border-radius:9px;
+  font:600 12px 'Geist',sans-serif; letter-spacing:0.02em;
+  cursor:pointer; transition:all .2s var(--ease);
+}
+.btn:hover { background:var(--elem-hover); border-color:var(--accent-edge); }
+.btn--primary {
+  background:linear-gradient(135deg, var(--accent-text), var(--accent) 60%, var(--accent-deep));
+  color:#fff; border-color:var(--accent-edge); box-shadow:0 0 12px var(--accent-glow);
+}
+.btn--primary:hover { transform:translateY(-1px); box-shadow:0 0 18px var(--accent-glow); }
+.btn--danger:hover { background:rgba(239,68,68,0.15); border-color:rgba(239,68,68,0.5); color:#ffb0b0; }
+.btn--xs { padding:5px 9px; font-size:10.5px; border-radius:6px; }
+
+table {
+  width:100%; border-collapse:collapse;
+  background:var(--surface); border:1px solid var(--border); border-radius:12px;
+  overflow:hidden;
+  backdrop-filter:blur(16px);
+}
+th, td { padding:11px 14px; text-align:left; font-size:12px; }
+th {
+  background:rgba(0,0,0,0.18); color:var(--muted);
+  font-size:10px; letter-spacing:0.12em; text-transform:uppercase; font-weight:700;
+}
+tbody tr { border-top:1px solid var(--border); transition:background .15s var(--ease); }
+tbody tr:hover { background:rgba(255,255,255,0.02); }
+.k-name { font-weight:500; }
+.k-key  { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--accent-text); cursor:pointer; }
+.k-key:hover { color:var(--text); text-decoration:underline; }
+.k-actions { display:flex; gap:5px; justify-content:flex-end; }
+.badge {
+  display:inline-block; padding:2px 7px; border-radius:4px;
+  font-size:9.5px; font-family:'JetBrains Mono',monospace;
+  letter-spacing:0.04em;
+}
+.badge--active   { background:rgba(74,222,128,0.15); color:var(--green); }
+.badge--revoked  { background:rgba(239,68,68,0.15); color:var(--red); }
+.badge--expired  { background:rgba(245,158,11,0.15); color:var(--yellow); }
+.badge--admin    { background:var(--accent-soft); color:var(--accent-text); margin-left:5px; }
+
+.gate {
+  position:fixed; inset:0;
+  display:grid; place-items:center;
+  background:rgba(7,7,13,0.6);
+  z-index:100;
+}
+.gate__box {
+  width:360px; max-width:calc(100vw - 32px);
+  padding:32px 28px;
+  background:var(--panel); backdrop-filter:blur(22px);
+  border:1px solid var(--border); border-radius:18px;
+  text-align:center;
+}
+.gate__brand { font-size:11px; font-weight:700; letter-spacing:0.32em; color:var(--accent-text); margin-bottom:14px; }
+.gate__title { font-size:17px; font-weight:600; margin-bottom:6px; }
+.gate__sub   { font-size:11px; color:var(--muted); margin-bottom:22px; }
+.gate__input {
+  display:block; width:100%; padding:11px 14px;
+  background:var(--elem); border:1px solid var(--border-strong); border-radius:10px;
+  color:var(--text); font-family:'JetBrains Mono',monospace; font-size:12px;
+  text-align:center; outline:none; transition:border-color .2s var(--ease);
+}
+.gate__input:focus { border-color:var(--accent-edge); }
+.gate__btn {
+  display:block; width:100%; margin-top:10px; padding:11px;
+  background:linear-gradient(135deg, var(--accent-text), var(--accent) 60%, var(--accent-deep));
+  color:#fff; border:1px solid var(--accent-edge); border-radius:10px;
+  font:600 12px 'Geist',sans-serif; letter-spacing:0.04em; cursor:pointer;
+  box-shadow:0 0 12px var(--accent-glow);
+}
+.gate__err { margin-top:12px; padding:7px 11px; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); border-radius:7px; color:#ffb0b0; font-size:11px; }
+.empty { text-align:center; padding:60px 20px; color:var(--muted); font-size:12px; }
+
+/* toast */
+.toast {
+  position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px);
+  padding:10px 18px;
+  background:var(--accent-soft); border:1px solid var(--accent-edge);
+  color:var(--accent-text); border-radius:999px;
+  font-size:11px; font-weight:600; letter-spacing:0.04em;
+  opacity:0; transition:all .25s var(--ease);
+  z-index:200;
+  box-shadow:0 0 24px var(--accent-glow);
+}
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+/* modal */
+.modal-bg {
+  position:fixed; inset:0; background:rgba(7,7,13,0.55);
+  display:grid; place-items:center; z-index:90;
+}
+.modal {
+  width:380px; max-width:calc(100vw - 32px); padding:24px;
+  background:var(--panel); backdrop-filter:blur(22px);
+  border:1px solid var(--border); border-radius:14px;
+}
+.modal h3 { margin:0 0 14px; font-size:14px; font-weight:600; }
+.modal label { display:block; font-size:10px; color:var(--muted); letter-spacing:0.1em; text-transform:uppercase; margin-bottom:5px; }
+.modal input {
+  width:100%; padding:9px 12px;
+  background:var(--elem); border:1px solid var(--border-strong); border-radius:8px;
+  color:var(--text); font-family:inherit; font-size:12px;
+  outline:none; margin-bottom:14px;
+}
+.modal input:focus { border-color:var(--accent-edge); }
+.modal .actions { display:flex; gap:10px; justify-content:flex-end; margin-top:6px; }
+.modal-success {
+  margin-top:14px; padding:10px;
+  background:rgba(74,222,128,0.08); border:1px solid rgba(74,222,128,0.3);
+  border-radius:8px;
+  font-family:'JetBrains Mono',monospace; font-size:10.5px;
+  color:var(--green); word-break:break-all; cursor:pointer;
+}
+</style>
+</head>
+<body>
+
+<div class="app" id="app" style="display:none">
+  <header>
+    <div>
+      <div class="brand">XRIO · Admin</div>
+      <div class="title">Key Management</div>
+    </div>
+    <div>
+      <button class="btn" onclick="signOut()">Sign out</button>
+    </div>
+  </header>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="toolbar">
+    <input id="search" type="text" placeholder="search by name or key…" oninput="render()">
+    <button class="btn btn--primary" onclick="openNew()">+ New Key</button>
+    <button class="btn" onclick="refresh()">↻ Refresh</button>
+    <button class="btn" onclick="promptSetPassword(false)">🔒 Password</button>
+    <button class="btn" onclick="signOut()">Sign out</button>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Key</th>
+        <th>Status</th>
+        <th>Expires</th>
+        <th style="text-align:right">Actions</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+</div>
+
+<div id="modal-root"></div>
+<div class="toast" id="toast"></div>
+
+<div class="gate" id="gate">
+  <div class="gate__box">
+    <div class="gate__brand">XRIO · Admin</div>
+    <div class="gate__title">Sign in</div>
+    <div class="gate__sub" id="gateSub">Enter your admin key</div>
+    <input class="gate__input" id="gateInput" type="text" placeholder="xrio_…" autocomplete="off">
+    <input class="gate__input" id="gatePass" type="password" placeholder="password" autocomplete="current-password" style="margin-top:8px;display:none">
+    <button class="gate__btn" onclick="signIn()">Sign in</button>
+    <div class="gate__err" id="gateErr" style="display:none"></div>
+    <div id="gateWarn" style="display:none;margin-top:12px;padding:7px 11px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:7px;color:#fbbf24;font-size:11px;text-align:left;line-height:1.4"></div>
+  </div>
+</div>
+
+<script>
+// Vercel-hosted admin → broker over public Cloudflare tunnel.
+// API_BASE auto-synced by auto_sync_tunnel.py on every tunnel rotation.
+const API_BASE = 'https://respectively-sms-expired-lenses.trycloudflare.com';
+
+let ADMIN_KEY  = localStorage.getItem('xrioAdminKey')  || '';
+let ADMIN_PASS = sessionStorage.getItem('xrioAdminPass') || '';
+let HAS_PASSWORD = false;
+let keys = [];
+let publicUrl = location.origin;
+let now = Math.floor(Date.now() / 1000);
+
+async function api(path) {
+  const sep = path.includes('?') ? '&' : '?';
+  let url = API_BASE + path + sep + 'admin_key=' + encodeURIComponent(ADMIN_KEY);
+  if (ADMIN_PASS) url += '&admin_pass=' + encodeURIComponent(ADMIN_PASS);
+  const r = await fetch(url);
+  return r.json().then(d => ({ ok: r.ok, status: r.status, data: d }));
+}
+
+async function apiStatus() {
+  const r = await fetch(API_BASE + '/api/admin/status');
+  return r.json();
+}
+
+async function refresh() {
+  const r = await api('/api/keys/list');
+  if (!r.ok) {
+    if (r.status === 401) { signOut(); return; }
+    return toast('Error: ' + (r.data.error || r.status));
+  }
+  keys = r.data.keys || [];
+  now = r.data.now || Math.floor(Date.now()/1000);
+  publicUrl = r.data.public_url || location.origin;
+  render();
+}
+
+function render() {
+  const q = (document.getElementById('search').value || '').toLowerCase();
+  const filtered = q
+    ? keys.filter(r => (r.name||'').toLowerCase().includes(q) || (r.key||'').toLowerCase().includes(q))
+    : keys;
+
+  // Stats
+  const stats = document.getElementById('stats');
+  const total = keys.length;
+  const active = keys.filter(r => !r.revoked && (!r.expires_at || r.expires_at > now)).length;
+  const expired = keys.filter(r => r.expires_at && r.expires_at <= now && !r.revoked).length;
+  const revoked = keys.filter(r => r.revoked).length;
+  stats.innerHTML = `
+    <div class="stat"><div class="stat__label">Total</div><div class="stat__val">${total}</div></div>
+    <div class="stat"><div class="stat__label">Active</div><div class="stat__val" style="color:var(--green)">${active}</div></div>
+    <div class="stat"><div class="stat__label">Expired</div><div class="stat__val" style="color:var(--yellow)">${expired}</div></div>
+    <div class="stat"><div class="stat__label">Revoked</div><div class="stat__val" style="color:var(--red)">${revoked}</div></div>
+  `;
+
+  const rows = document.getElementById('rows');
+  if (filtered.length === 0) {
+    rows.innerHTML = `<tr><td colspan="5"><div class="empty">${total === 0 ? 'No keys yet — click + New Key' : 'No matches'}</div></td></tr>`;
+    return;
+  }
+  rows.innerHTML = filtered.map(r => {
+    const status = r.revoked ? 'revoked'
+                 : (r.expires_at && r.expires_at <= now ? 'expired' : 'active');
+    const exp = r.expires_at
+      ? new Date(r.expires_at * 1000).toISOString().slice(0,10) +
+        ' (' + Math.round((r.expires_at - now) / 86400) + 'd)'
+      : '<span style="color:var(--muted)">never</span>';
+    return `
+      <tr>
+        <td class="k-name">${escapeHtml(r.name || '?')} ${r.admin ? '<span class="badge badge--admin">ADMIN</span>' : ''}</td>
+        <td><span class="k-key" onclick="copyUrl('${r.key}')" title="click to copy customer URL">${r.key.slice(0,24)}…</span></td>
+        <td><span class="badge badge--${status}">${status}</span></td>
+        <td>${exp}</td>
+        <td class="k-actions">
+          <button class="btn btn--xs" onclick="copyUrl('${r.key}')">URL</button>
+          <button class="btn btn--xs" onclick="extend('${r.key}', 30)">+30d</button>
+          ${r.revoked
+            ? `<button class="btn btn--xs" onclick="act('unrevoke','${r.key}')">Restore</button>`
+            : `<button class="btn btn--xs btn--danger" onclick="act('revoke','${r.key}')">Revoke</button>`}
+          <button class="btn btn--xs btn--danger" onclick="del('${r.key}')">Del</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function escapeHtml(s) { return String(s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])); }
+
+function copyUrl(k) {
+  const url = `${publicUrl}/?key=${k}`;
+  navigator.clipboard.writeText(url).then(() => toast('Customer URL copied'));
+}
+async function act(action, k) {
+  if (action === 'revoke' && !confirm('Revoke key? Active session will be kicked.')) return;
+  const r = await api(`/api/keys/${action}?k=${encodeURIComponent(k)}`);
+  if (r.ok) { toast(action + ' ok'); refresh(); }
+  else toast('Error: ' + (r.data.error || r.status));
+}
+async function extend(k, days) {
+  const r = await api(`/api/keys/extend?k=${encodeURIComponent(k)}&days=${days}`);
+  if (r.ok) { toast('+' + days + ' days'); refresh(); }
+  else toast('Error');
+}
+async function del(k) {
+  if (!confirm('DELETE this key permanently? Cannot undo.')) return;
+  const r = await api(`/api/keys/delete?k=${encodeURIComponent(k)}`);
+  if (r.ok) { toast('deleted'); refresh(); }
+  else toast('Error');
+}
+
+function openNew() {
+  const m = document.createElement('div');
+  m.className = 'modal-bg';
+  m.innerHTML = `
+    <div class="modal" onclick="event.stopPropagation()">
+      <h3>Issue new key</h3>
+      <label>Customer name / label</label>
+      <input id="nm" type="text" placeholder="e.g. Friend A">
+      <label>Expiry (days · 0 = never)</label>
+      <input id="dy" type="number" value="30" min="0">
+      <div class="actions">
+        <button class="btn" onclick="closeModal()">Cancel</button>
+        <button class="btn btn--primary" onclick="doNew()">Issue</button>
+      </div>
+      <div id="modal-success" style="display:none"></div>
+    </div>
+  `;
+  m.onclick = closeModal;
+  document.getElementById('modal-root').appendChild(m);
+  setTimeout(() => document.getElementById('nm').focus(), 50);
+}
+function closeModal() { document.getElementById('modal-root').innerHTML = ''; }
+async function doNew() {
+  const name = document.getElementById('nm').value || 'unnamed';
+  const days = parseInt(document.getElementById('dy').value || '30', 10);
+  const r = await api(`/api/keys/new?name=${encodeURIComponent(name)}&days=${days}`);
+  if (!r.ok) return toast('Error: ' + (r.data.error || r.status));
+  const url = r.data.url;
+  const ms = document.getElementById('modal-success');
+  ms.style.display = 'block';
+  ms.className = 'modal-success';
+  ms.textContent = url + '  (click to copy)';
+  ms.onclick = () => { navigator.clipboard.writeText(url); toast('URL copied · send to customer'); };
+  refresh();
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._h);
+  t._h = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+async function signIn() {
+  const k = document.getElementById('gateInput').value.trim();
+  const p = document.getElementById('gatePass').value;
+  if (!k) return;
+  ADMIN_KEY  = k;
+  ADMIN_PASS = p;
+  const r = await api('/api/keys/list');
+  if (r.ok) {
+    localStorage.setItem('xrioAdminKey', ADMIN_KEY);
+    if (ADMIN_PASS) sessionStorage.setItem('xrioAdminPass', ADMIN_PASS);
+    document.getElementById('gate').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    keys = r.data.keys || []; now = r.data.now; publicUrl = r.data.public_url || location.origin;
+    render();
+    if (!HAS_PASSWORD) promptSetPassword(true);
+  } else {
+    const err = document.getElementById('gateErr');
+    err.style.display = 'block';
+    if (r.status === 429) err.textContent = 'Too many failed attempts. Try again in a few minutes.';
+    else if (r.status === 401) err.textContent = HAS_PASSWORD ? 'Wrong key or password.' : 'Not an admin key.';
+    else err.textContent = 'Error: ' + (r.data.error || r.status);
+    ADMIN_KEY = ''; ADMIN_PASS = '';
+    localStorage.removeItem('xrioAdminKey');
+    sessionStorage.removeItem('xrioAdminPass');
+  }
+}
+function signOut() {
+  ADMIN_KEY = ''; ADMIN_PASS = '';
+  localStorage.removeItem('xrioAdminKey');
+  sessionStorage.removeItem('xrioAdminPass');
+  location.reload();
+}
+
+function promptSetPassword(initial) {
+  const m = document.createElement('div');
+  m.className = 'modal-bg';
+  const titleTxt = initial ? 'Set admin password' : 'Change admin password';
+  const oldHtml = HAS_PASSWORD ? '<label>Current password</label><input id="pwOld" type="password" autocomplete="current-password">' : '';
+  m.innerHTML = `
+    <div class="modal" onclick="event.stopPropagation()">
+      <h3>${titleTxt}</h3>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:14px;line-height:1.5">
+        ${initial ? 'Add a 2nd-factor password so a leaked admin key alone can\\'t access this panel.' : ''}
+        Min 8 chars. Brute-force is rate-limited (5 tries / 5 min lockout).
+      </div>
+      ${oldHtml}
+      <label>New password</label>
+      <input id="pwNew" type="password" autocomplete="new-password">
+      <label>Confirm</label>
+      <input id="pwNew2" type="password" autocomplete="new-password">
+      <div class="actions">
+        <button class="btn" onclick="closeModal()">${initial ? 'Skip' : 'Cancel'}</button>
+        <button class="btn btn--primary" onclick="doSetPassword()">Save</button>
+      </div>
+    </div>
+  `;
+  m.onclick = closeModal;
+  document.getElementById('modal-root').appendChild(m);
+  setTimeout(() => document.getElementById(HAS_PASSWORD ? 'pwOld' : 'pwNew').focus(), 50);
+}
+async function doSetPassword() {
+  const newPw  = document.getElementById('pwNew').value;
+  const newPw2 = document.getElementById('pwNew2').value;
+  if (newPw.length < 8) return toast('Password must be ≥ 8 chars');
+  if (newPw !== newPw2) return toast('Passwords don\\'t match');
+  let qs = 'new=' + encodeURIComponent(newPw) + '&admin_key=' + encodeURIComponent(ADMIN_KEY);
+  if (HAS_PASSWORD) {
+    const old = document.getElementById('pwOld').value;
+    qs += '&old=' + encodeURIComponent(old);
+  }
+  const r = await fetch(API_BASE + '/api/admin/setup?' + qs);
+  const d = await r.json();
+  if (!r.ok) return toast('Error: ' + (d.error || r.status));
+  ADMIN_PASS = newPw;
+  sessionStorage.setItem('xrioAdminPass', ADMIN_PASS);
+  HAS_PASSWORD = true;
+  closeModal();
+  toast(HAS_PASSWORD ? 'Password updated' : 'Password set');
+}
+
+document.getElementById('gateInput').addEventListener('keydown', e => { if (e.key === 'Enter') signIn(); });
+document.getElementById('gatePass') .addEventListener('keydown', e => { if (e.key === 'Enter') signIn(); });
+
+(async () => {
+  let status;
+  try { status = await apiStatus(); } catch { status = {has_password:false}; }
+  HAS_PASSWORD = !!status.has_password;
+  const gatePass = document.getElementById('gatePass');
+  const gateWarn = document.getElementById('gateWarn');
+  const gateSub  = document.getElementById('gateSub');
+  if (HAS_PASSWORD) {
+    gatePass.style.display = 'block';
+    gateSub.textContent = 'Admin key + password';
+  } else {
+    gateWarn.style.display = 'block';
+    gateWarn.innerHTML = '⚠ No password set. Anyone with your admin key can sign in. After login, click <b>Set Password</b>.';
+  }
+  if (status.locked) {
+    const err = document.getElementById('gateErr');
+    err.style.display = 'block';
+    err.textContent = 'This IP is temporarily locked (too many failed attempts).';
+  }
+  // Auto sign-in if we have both creds saved
+  if (ADMIN_KEY && (!HAS_PASSWORD || ADMIN_PASS)) {
+    const r = await api('/api/keys/list');
+    if (r.ok) {
+      document.getElementById('gate').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      keys = r.data.keys || []; now = r.data.now; publicUrl = r.data.public_url || location.origin;
+      render();
+      if (!HAS_PASSWORD) promptSetPassword(true);
+      return;
+    }
+    // Stale creds — drop & fall through to gate
+    ADMIN_KEY = ''; ADMIN_PASS = '';
+    localStorage.removeItem('xrioAdminKey');
+    sessionStorage.removeItem('xrioAdminPass');
+  }
+  setTimeout(() => document.getElementById('gateInput').focus(), 50);
+})();
+</script>
+</body>
+</html>
