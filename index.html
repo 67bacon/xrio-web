@@ -580,12 +580,7 @@ body {
 /* ==========================================================================
    STATE — minimal, all WebSocket logic preserved from original.
    ========================================================================== */
-// Broker URL resolution:
-//   - localhost / 127.0.0.1  → ws://<host>/  (direct local broker)
-//   - anything else (Vercel, GitHub Pages, etc.) → wss://<TUNNEL>/  via Cloudflare Tunnel.
-// Override either via ?broker=<host:port> query, or by setting
-// localStorage.xrioBroker before load. trycloudflare URLs rotate when the
-// tunnel restarts — for production switch to a named tunnel.
+// Broker URL: tunnel for hosted, direct ws:// for localhost
 const TUNNEL_DEFAULT = 'respectively-sms-expired-lenses.trycloudflare.com';
 const WS_URL = (() => {
   const qp = new URLSearchParams(location.search).get('broker');
@@ -593,11 +588,17 @@ const WS_URL = (() => {
   const ls = localStorage.getItem('xrioBroker');
   if (ls) return (ls.startsWith('ws') ? ls : 'wss://' + ls + '/');
   const h = location.hostname;
-  if (h === 'localhost' || h === '127.0.0.1' || h === '') {
-    return `ws://${location.host}/`;
-  }
+  if (h === 'localhost' || h === '127.0.0.1' || h === '') return `ws://${location.host}/`;
   return 'wss://' + TUNNEL_DEFAULT + '/';
 })();
+
+// Customer key: from ?key=... query, or localStorage (auto-saved on first visit)
+const ACCESS_KEY = (() => {
+  const qp = new URLSearchParams(location.search).get('key');
+  if (qp) { try { localStorage.setItem('xrioKey', qp); } catch {} return qp; }
+  return localStorage.getItem('xrioKey') || '';
+})();
+let authError = null;
 let   ws = null;
 let   schema = [];
 let   flags = {};
@@ -654,14 +655,28 @@ function connect() {
   }
   ws.onopen = () => {
     setStatus(true, luaConnected);
-    ws.send(JSON.stringify({ type: 'hello', role: 'ui' }));
+    ws.send(JSON.stringify({ type: 'hello', role: 'ui', key: ACCESS_KEY }));
   };
-  ws.onclose = () => { setStatus(false, false); setTimeout(connect, 1000); };
+  ws.onclose = (ev) => {
+    setStatus(false, false);
+    // 4401 = auth rejected — don't retry, show error
+    if (ev && ev.code === 4401) {
+      authError = ev.reason || 'auth rejected';
+      showEmpty();
+      return;
+    }
+    setTimeout(connect, 1000);
+  };
   ws.onerror = () => {};
   ws.onmessage = (ev) => {
     let msg;
     try { msg = JSON.parse(ev.data); } catch { return; }
 
+    if (msg.type === 'auth_error') {
+      authError = msg.reason || 'auth rejected';
+      showEmpty();
+      return;
+    }
     if (msg.type === 'init') {
       luaConnected = !!msg.lua_connected;
       schema = msg.schema || [];
@@ -1183,12 +1198,30 @@ function showEmpty() {
   controlRefs.clear();
   schemaSig = '';
 
-  if (document.querySelector('.empty-state')) return;
+  const existing = document.querySelector('.empty-state');
+  if (existing) existing.remove();
+
   const e = el('div', 'empty-state');
   e.appendChild(el('div', 'empty-state__spinner'));
-  e.appendChild(el('div', 'empty-state__title', luaConnected ? 'Connected · waiting for schema' : 'Lua side not connected'));
-  e.appendChild(el('div', null, luaConnected ? 'The Lua client is online but hasn\u2019t pushed its schema yet.' : 'Inject xrio into Roblox and the panels will appear here.'));
-  e.appendChild(el('span', 'empty-state__hint', 'ws://' + location.host + '/'));
+
+  if (authError) {
+    e.appendChild(el('div', 'empty-state__title', 'Access denied'));
+    e.appendChild(el('div', null,
+      authError === 'expired'  ? 'Your key has expired. Contact the owner to renew.' :
+      authError === 'revoked'  ? 'Your key was revoked.' :
+      authError === 'unknown key' ? 'Invalid key \u2014 check the URL you were given.' :
+      authError === 'missing key' ? 'No key provided. Append ?key=YOUR_KEY to the URL.' :
+      authError));
+    e.appendChild(el('span', 'empty-state__hint', ACCESS_KEY ? ('key: ' + ACCESS_KEY.slice(0,12) + '\u2026') : 'no key in URL'));
+  } else if (!ACCESS_KEY) {
+    e.appendChild(el('div', 'empty-state__title', 'Key required'));
+    e.appendChild(el('div', null, 'Append ?key=YOUR_KEY to the URL or save one in localStorage.'));
+    e.appendChild(el('span', 'empty-state__hint', '?key=xrio_\u2026'));
+  } else {
+    e.appendChild(el('div', 'empty-state__title', luaConnected ? 'Connected \u00b7 waiting for schema' : 'Lua side not connected'));
+    e.appendChild(el('div', null, luaConnected ? 'Lua online, no schema yet.' : 'Inject xrio in Roblox and panels will appear.'));
+    e.appendChild(el('span', 'empty-state__hint', 'key: ' + ACCESS_KEY.slice(0,12) + '\u2026'));
+  }
   document.body.appendChild(e);
 }
 
