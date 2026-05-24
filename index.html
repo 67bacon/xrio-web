@@ -580,7 +580,24 @@ body {
 /* ==========================================================================
    STATE — minimal, all WebSocket logic preserved from original.
    ========================================================================== */
-const WS_URL = `ws://${location.host}/`;
+// Broker URL resolution:
+//   - localhost / 127.0.0.1  → ws://<host>/  (direct local broker)
+//   - anything else (Vercel, GitHub Pages, etc.) → wss://<TUNNEL>/  via Cloudflare Tunnel.
+// Override either via ?broker=<host:port> query, or by setting
+// localStorage.xrioBroker before load. trycloudflare URLs rotate when the
+// tunnel restarts — for production switch to a named tunnel.
+const TUNNEL_DEFAULT = 'respectively-sms-expired-lenses.trycloudflare.com';
+const WS_URL = (() => {
+  const qp = new URLSearchParams(location.search).get('broker');
+  if (qp) return (qp.startsWith('ws') ? qp : 'wss://' + qp + '/');
+  const ls = localStorage.getItem('xrioBroker');
+  if (ls) return (ls.startsWith('ws') ? ls : 'wss://' + ls + '/');
+  const h = location.hostname;
+  if (h === 'localhost' || h === '127.0.0.1' || h === '') {
+    return `ws://${location.host}/`;
+  }
+  return 'wss://' + TUNNEL_DEFAULT + '/';
+})();
 let   ws = null;
 let   schema = [];
 let   flags = {};
