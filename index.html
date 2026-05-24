@@ -814,10 +814,8 @@ function setStatus(brokerConnected, lua) {
    WEBSOCKET — same protocol as before
    ========================================================================== */
 function connect() {
-  // Tolerate hostile contexts (e.g. previewed over https):
-  //   - WebSocket(ws://...) on an https page throws SecurityError.
-  //   - In production this is loaded from a local http://localhost server,
-  //     so `ws://` is fine. In a preview, just stay in the empty state.
+  // Don't bother dialing the broker without a key — show the gate instead.
+  if (!ACCESS_KEY) { showEmpty(); return; }
   try {
     ws = new WebSocket(WS_URL);
   } catch (err) {
