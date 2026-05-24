@@ -1273,10 +1273,30 @@ function buildPanel(tab, controls, index, total) {
     });
   };
 
-  // Initial: open first section
+  // Persist open/closed state per tab so refreshes don't reset the layout.
+  const stateKey = 'xrio_sections_' + tab;
+  const loadOpenSet = () => {
+    try {
+      const raw = localStorage.getItem(stateKey);
+      if (raw == null) return null; // first visit
+      return new Set(JSON.parse(raw));
+    } catch { return null; }
+  };
+  const saveOpenSet = () => {
+    const open = sectionRefs.filter(s => s.divider.classList.contains('open')).map(s => s.name);
+    try { localStorage.setItem(stateKey, JSON.stringify(open)); } catch {}
+  };
+
+  // Initial: restore saved open sections, or open first section on first visit
   if (sectionRefs.length > 0) {
-    // Defer one frame so scrollHeight is correct after DOM insert
-    requestAnimationFrame(() => openSection(sectionRefs[0]));
+    const saved = loadOpenSet();
+    requestAnimationFrame(() => {
+      if (saved == null) {
+        openSection(sectionRefs[0]);
+      } else {
+        for (const s of sectionRefs) if (saved.has(s.name)) openSection(s);
+      }
+    });
   }
 
   // Click to expand/collapse + auto-close siblings if total would overflow viewport
@@ -1294,6 +1314,7 @@ function buildPanel(tab, controls, index, total) {
     s.divider.addEventListener('click', () => {
       if (s.divider.classList.contains('open')) {
         closeSection(s);
+        saveOpenSet();
         return;
       }
       // Close other open sections if this one would overflow
@@ -1307,6 +1328,7 @@ function buildPanel(tab, controls, index, total) {
         }
       }
       openSection(s);
+      saveOpenSet();
     });
   });
 
