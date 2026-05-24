@@ -566,12 +566,19 @@ body {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── key gate (shown when no key / auth error) ── */
-.gate {
+.gate-wrap {
   position: fixed;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 50;
+  padding: 16px;
+  pointer-events: none;
+}
+.gate {
+  pointer-events: auto;
   width: 380px;
-  max-width: calc(100vw - 32px);
+  max-width: 100%;
   padding: 32px 28px;
   background: var(--panel-bg);
   backdrop-filter: blur(22px) saturate(150%);
@@ -748,7 +755,8 @@ let ACCESS_KEY = (() => {
 let authError = null;
 function setAccessKey(k) {
   ACCESS_KEY = (k || '').trim();
-  try { localStorage.setItem('xrioKey', ACCESS_KEY); } catch {}
+  // Do NOT persist yet — wait for the broker to confirm the key is valid.
+  // Persistence happens in ws.onmessage when 'init' arrives (auth succeeded).
   authError = null;
   if (ws) { try { ws.close(); } catch {} ws = null; }
   setStatus(false, false);
@@ -823,9 +831,11 @@ function connect() {
   };
   ws.onclose = (ev) => {
     setStatus(false, false);
-    // 4401 = auth rejected — don't retry, show error
+    // 4401 = auth rejected — don't retry, clear bad key, show error
     if (ev && ev.code === 4401) {
       authError = ev.reason || 'auth rejected';
+      ACCESS_KEY = '';
+      try { localStorage.removeItem('xrioKey'); } catch {}
       showEmpty();
       return;
     }
@@ -838,10 +848,14 @@ function connect() {
 
     if (msg.type === 'auth_error') {
       authError = msg.reason || 'auth rejected';
+      ACCESS_KEY = '';   // clear bad key so reload doesn't loop
+      try { localStorage.removeItem('xrioKey'); } catch {}
       showEmpty();
       return;
     }
     if (msg.type === 'init') {
+      // Auth succeeded — NOW persist the key so it survives reload.
+      try { localStorage.setItem('xrioKey', ACCESS_KEY); } catch {}
       luaConnected = !!msg.lua_connected;
       schema = msg.schema || [];
       flags  = msg.flags  || {};
@@ -1373,7 +1387,9 @@ function renderStatusbar() {
 }
 
 function renderGate() {
-  // Centered key input. Shown when ACCESS_KEY is empty OR auth was rejected.
+  // Wrap in a grid centerer so the gate is reliably in the viewport center
+  // (independent of body padding / panel-root absolute positioning quirks).
+  const wrap = el('div', 'gate-wrap');
   const g = el('div', 'gate');
   g.appendChild(el('div', 'gate__brand', 'XRIO Access'));
   g.appendChild(el('div', 'gate__title',
@@ -1383,7 +1399,7 @@ function renderGate() {
     sub.textContent =
       authError === 'expired'  ? 'Your key has expired. Contact the owner to renew.' :
       authError === 'revoked'  ? 'Your key was revoked.' :
-      authError === 'unknown key' ? 'That key is invalid. Double-check what you were given.' :
+      authError === 'unknown key' ? 'That key is invalid. Try again.' :
       ('Auth failed: ' + authError);
   } else {
     sub.textContent = 'No key? Buy one from the owner. Without a valid key, the UI does nothing.';
@@ -1394,11 +1410,13 @@ function renderGate() {
   input.placeholder = 'xrio_\u2026';
   input.autocomplete = 'off';
   input.spellcheck = false;
-  if (ACCESS_KEY && authError) input.value = ACCESS_KEY;  // let them edit a rejected key
+  // After a rejection we leave the field BLANK so the user can clean-type.
+  // (We don't pre-fill a known-bad key \u2014 that's just confusing.)
   g.appendChild(input);
   const btn = el('button', 'gate__btn', 'Connect');
   g.appendChild(btn);
-  document.body.appendChild(g);
+  wrap.appendChild(g);
+  document.body.appendChild(wrap);
   setTimeout(() => input.focus(), 80);
 
   const submit = () => {
