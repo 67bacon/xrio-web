@@ -438,7 +438,7 @@ function promptSetPassword(initial) {
     <div class="modal" onclick="event.stopPropagation()">
       <h3>${titleTxt}</h3>
       <div style="font-size:11px;color:var(--muted);margin-bottom:14px;line-height:1.5">
-        ${initial ? 'Add a 2nd-factor password so a leaked admin key alone can\\'t access this panel.' : ''}
+        ${initial ? 'Add a 2nd-factor password so a leaked admin key alone cannot access this panel.' : ''}
         Min 8 chars. Brute-force is rate-limited (5 tries / 5 min lockout).
       </div>
       ${oldHtml}
@@ -460,7 +460,7 @@ async function doSetPassword() {
   const newPw  = document.getElementById('pwNew').value;
   const newPw2 = document.getElementById('pwNew2').value;
   if (newPw.length < 8) return toast('Password must be ≥ 8 chars');
-  if (newPw !== newPw2) return toast('Passwords don\\'t match');
+  if (newPw !== newPw2) return toast('Passwords do not match');
   let qs = 'new=' + encodeURIComponent(newPw) + '&admin_key=' + encodeURIComponent(ADMIN_KEY);
   if (HAS_PASSWORD) {
     const old = document.getElementById('pwOld').value;
