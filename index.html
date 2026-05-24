@@ -564,16 +564,163 @@ body {
   animation: spin 0.9s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── key gate (shown when no key / auth error) ── */
+.gate {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  padding: 32px 28px;
+  background: var(--panel-bg);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  border: 1px solid var(--border-soft);
+  border-radius: 18px;
+  box-shadow: var(--shadow-panel);
+  text-align: center;
+  animation: panelIn 0.45s var(--ease);
+}
+.gate__brand {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.32em;
+  color: var(--accent-text);
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+.gate__title {
+  font-size: 17px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  letter-spacing: -0.01em;
+}
+.gate__sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 22px;
+  line-height: 1.5;
+}
+.gate__input {
+  display: block; width: 100%;
+  padding: 11px 14px;
+  background: var(--slider-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  text-align: center;
+  letter-spacing: 0.02em;
+  outline: none;
+  transition: border-color var(--t-base), box-shadow var(--t-base);
+}
+.gate__input:focus {
+  border-color: var(--accent-edge);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.gate__input::placeholder { color: var(--muted); letter-spacing: 0.12em; }
+.gate__btn {
+  display: block; width: 100%; margin-top: 10px;
+  padding: 11px;
+  background: linear-gradient(135deg, var(--accent-text), var(--accent) 60%, var(--accent-deep));
+  color: #fff;
+  border: 1px solid var(--accent-edge);
+  border-radius: 10px;
+  font-family: inherit; font-size: 12px; font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  box-shadow: 0 0 12px var(--accent-glow);
+  transition: transform var(--t-base), box-shadow var(--t-base);
+}
+.gate__btn:hover { transform: translateY(-1px); box-shadow: 0 0 18px var(--accent-glow); }
+.gate__btn:active { transform: translateY(0); }
+.gate__error {
+  margin-top: 14px;
+  padding: 8px 12px;
+  background: rgba(255, 80, 80, 0.10);
+  border: 1px solid rgba(255, 80, 80, 0.30);
+  border-radius: 8px;
+  color: #ffb0b0;
+  font-size: 11px;
+}
+
+/* ── loader command card (shown after auth, bottom-right) ── */
+.loader-card {
+  position: fixed;
+  right: 16px; bottom: 16px;
+  z-index: 90;
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  padding: 12px 14px;
+  background: var(--panel-bg);
+  backdrop-filter: blur(18px) saturate(150%);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  box-shadow: var(--shadow-panel);
+  font-size: 11px;
+  transition: opacity var(--t-base), transform var(--t-base);
+}
+.loader-card.collapsed { transform: translateY(calc(100% + 16px)); opacity: 0; pointer-events: none; }
+.loader-card__head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+  color: var(--muted);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 700;
+  font-size: 10px;
+}
+.loader-card__close {
+  background: none; border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0 4px;
+  transition: color var(--t-base);
+}
+.loader-card__close:hover { color: var(--text); }
+.loader-card__code {
+  display: block;
+  padding: 8px 10px;
+  background: var(--slider-bg);
+  border: 1px solid var(--border-hair);
+  border-radius: 7px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  color: var(--accent-text);
+  overflow-x: auto;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--t-base);
+}
+.loader-card__code:hover { background: var(--elem); }
+.loader-card__hint {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 10px;
+  text-align: center;
+  letter-spacing: 0.04em;
+}
+.loader-card__hint.copied { color: var(--accent-text); }
+.loader-card__signout {
+  margin-top: 6px;
+  text-align: center;
+}
+.loader-card__signout a {
+  color: var(--muted);
+  font-size: 10px;
+  text-decoration: none;
+  cursor: pointer;
+  border-bottom: 1px dashed var(--border-soft);
+}
+.loader-card__signout a:hover { color: var(--accent-text); }
 </style>
 </head>
 <body>
 
-<div class="statusbar">
-  <div id="dot" class="dot pulse"></div>
-  <span id="status-text">connecting to broker…</span>
-  <span class="brand">XRIO <span class="accent">v1</span></span>
-</div>
-
+<!-- statusbar is rendered dynamically only when authenticated (see renderStatusbar) -->
 <div class="panels-root" id="panels-root"></div>
 
 <script>
@@ -592,13 +739,29 @@ const WS_URL = (() => {
   return 'wss://' + TUNNEL_DEFAULT + '/';
 })();
 
-// Customer key: from ?key=... query, or localStorage (auto-saved on first visit)
-const ACCESS_KEY = (() => {
+// Customer key resolution: ?key= (URL) → localStorage → empty (prompt in UI)
+let ACCESS_KEY = (() => {
   const qp = new URLSearchParams(location.search).get('key');
   if (qp) { try { localStorage.setItem('xrioKey', qp); } catch {} return qp; }
   return localStorage.getItem('xrioKey') || '';
 })();
 let authError = null;
+function setAccessKey(k) {
+  ACCESS_KEY = (k || '').trim();
+  try { localStorage.setItem('xrioKey', ACCESS_KEY); } catch {}
+  authError = null;
+  if (ws) { try { ws.close(); } catch {} ws = null; }
+  setStatus(false, false);
+  showEmpty();
+  setTimeout(connect, 100);
+}
+function clearAccessKey() {
+  ACCESS_KEY = '';
+  try { localStorage.removeItem('xrioKey'); } catch {}
+  authError = null;
+  if (ws) { try { ws.close(); } catch {} ws = null; }
+  showEmpty();
+}
 let   ws = null;
 let   schema = [];
 let   flags = {};
@@ -626,6 +789,7 @@ const SEND_THROTTLE_MS = 40;
 function setStatus(brokerConnected, lua) {
   const dot = document.getElementById('dot');
   const txt = document.getElementById('status-text');
+  if (!dot || !txt) return;   // statusbar not mounted yet (e.g. on gate screen)
   if (!brokerConnected) {
     dot.className = 'dot pulse';
     txt.textContent = 'reconnecting to broker…';
@@ -1142,12 +1306,13 @@ function buildPanel(tab, controls, index, total) {
 
 function rebuildIfSchemaChanged() {
   const root = document.getElementById('panels-root');
-  // Remove empty state if present
-  const existingEmpty = document.querySelector('.empty-state');
-  if (existingEmpty) existingEmpty.remove();
+  // Remove empty state but keep statusbar + loader-card
+  document.querySelectorAll('.empty-state, .gate').forEach(n => n.remove());
+  renderStatusbar();    // ensure status bar exists
+  renderLoaderCard();   // and the inject one-liner card
 
   if (!luaConnected || schema.length === 0) {
-    showEmpty();
+    renderEmptyConnected();
     return;
   }
 
@@ -1192,37 +1357,120 @@ function applyAllFlags() {
   }
 }
 
+function clearOverlays() {
+  document.querySelectorAll('.empty-state, .gate, .loader-card, .statusbar').forEach(n => n.remove());
+}
+
+function renderStatusbar() {
+  if (document.querySelector('.statusbar')) return;
+  const bar = el('div', 'statusbar');
+  const dot = el('div', 'dot pulse'); dot.id = 'dot';
+  const txt = el('span', null, 'connecting\u2026'); txt.id = 'status-text';
+  const brand = el('span', 'brand');
+  brand.innerHTML = 'XRIO <span class="accent">v1</span>';
+  bar.appendChild(dot); bar.appendChild(txt); bar.appendChild(brand);
+  document.body.appendChild(bar);
+}
+
+function renderGate() {
+  // Centered key input. Shown when ACCESS_KEY is empty OR auth was rejected.
+  const g = el('div', 'gate');
+  g.appendChild(el('div', 'gate__brand', 'XRIO Access'));
+  g.appendChild(el('div', 'gate__title',
+    authError ? 'Access denied' : 'Enter your access key'));
+  const sub = el('div', 'gate__sub');
+  if (authError) {
+    sub.textContent =
+      authError === 'expired'  ? 'Your key has expired. Contact the owner to renew.' :
+      authError === 'revoked'  ? 'Your key was revoked.' :
+      authError === 'unknown key' ? 'That key is invalid. Double-check what you were given.' :
+      ('Auth failed: ' + authError);
+  } else {
+    sub.textContent = 'No key? Buy one from the owner. Without a valid key, the UI does nothing.';
+  }
+  g.appendChild(sub);
+  const input = el('input', 'gate__input');
+  input.type = 'text';
+  input.placeholder = 'xrio_\u2026';
+  input.autocomplete = 'off';
+  input.spellcheck = false;
+  if (ACCESS_KEY && authError) input.value = ACCESS_KEY;  // let them edit a rejected key
+  g.appendChild(input);
+  const btn = el('button', 'gate__btn', 'Connect');
+  g.appendChild(btn);
+  document.body.appendChild(g);
+  setTimeout(() => input.focus(), 80);
+
+  const submit = () => {
+    const v = input.value.trim();
+    if (!v) { input.focus(); return; }
+    setAccessKey(v);
+  };
+  btn.addEventListener('click', submit);
+  input.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') submit(); });
+}
+
+function renderLoaderCard() {
+  if (document.querySelector('.loader-card')) return;
+  // Build the executor one-liner with the key embedded.
+  const oneLiner =
+    `_G._XRIO_KEY="${ACCESS_KEY}";loadstring(game:HttpGet("https://xrio-web.vercel.app/loader.lua"))()`;
+  const card = el('div', 'loader-card');
+  const head = el('div', 'loader-card__head');
+  head.appendChild(el('span', null, 'Inject in Roblox'));
+  const closeBtn = el('button', 'loader-card__close', '\u00d7');
+  closeBtn.title = 'hide (re-show by reopening the page)';
+  closeBtn.onclick = () => card.classList.add('collapsed');
+  head.appendChild(closeBtn);
+  card.appendChild(head);
+  const code = el('code', 'loader-card__code', oneLiner);
+  card.appendChild(code);
+  const hint = el('div', 'loader-card__hint', 'click code to copy');
+  card.appendChild(hint);
+  const signout = el('div', 'loader-card__signout');
+  const a = el('a', null, 'sign out (clear saved key)');
+  a.onclick = clearAccessKey;
+  signout.appendChild(a);
+  card.appendChild(signout);
+  code.addEventListener('click', () => {
+    navigator.clipboard.writeText(oneLiner).then(() => {
+      hint.classList.add('copied');
+      hint.textContent = '\u2713 copied \u2014 paste in your executor';
+      setTimeout(() => { hint.classList.remove('copied'); hint.textContent = 'click code to copy'; }, 2500);
+    }).catch(() => { hint.textContent = 'press Ctrl+C to copy'; });
+  });
+  document.body.appendChild(card);
+}
+
+function renderEmptyConnected() {
+  const e = el('div', 'empty-state');
+  e.appendChild(el('div', 'empty-state__spinner'));
+  e.appendChild(el('div', 'empty-state__title',
+    luaConnected ? 'Connected \u00b7 waiting for schema' : 'Inject xrio in Roblox'));
+  e.appendChild(el('div', null,
+    luaConnected ? 'Lua online, no schema yet.' : 'Paste the one-liner below into your executor.'));
+  e.appendChild(el('span', 'empty-state__hint', 'key: ' + ACCESS_KEY.slice(0,12) + '\u2026'));
+  document.body.appendChild(e);
+}
+
 function showEmpty() {
   const root = document.getElementById('panels-root');
   root.innerHTML = '';
   controlRefs.clear();
   schemaSig = '';
 
-  const existing = document.querySelector('.empty-state');
-  if (existing) existing.remove();
+  clearOverlays();
 
-  const e = el('div', 'empty-state');
-  e.appendChild(el('div', 'empty-state__spinner'));
-
-  if (authError) {
-    e.appendChild(el('div', 'empty-state__title', 'Access denied'));
-    e.appendChild(el('div', null,
-      authError === 'expired'  ? 'Your key has expired. Contact the owner to renew.' :
-      authError === 'revoked'  ? 'Your key was revoked.' :
-      authError === 'unknown key' ? 'Invalid key \u2014 check the URL you were given.' :
-      authError === 'missing key' ? 'No key provided. Append ?key=YOUR_KEY to the URL.' :
-      authError));
-    e.appendChild(el('span', 'empty-state__hint', ACCESS_KEY ? ('key: ' + ACCESS_KEY.slice(0,12) + '\u2026') : 'no key in URL'));
-  } else if (!ACCESS_KEY) {
-    e.appendChild(el('div', 'empty-state__title', 'Key required'));
-    e.appendChild(el('div', null, 'Append ?key=YOUR_KEY to the URL or save one in localStorage.'));
-    e.appendChild(el('span', 'empty-state__hint', '?key=xrio_\u2026'));
-  } else {
-    e.appendChild(el('div', 'empty-state__title', luaConnected ? 'Connected \u00b7 waiting for schema' : 'Lua side not connected'));
-    e.appendChild(el('div', null, luaConnected ? 'Lua online, no schema yet.' : 'Inject xrio in Roblox and panels will appear.'));
-    e.appendChild(el('span', 'empty-state__hint', 'key: ' + ACCESS_KEY.slice(0,12) + '\u2026'));
+  // No key OR auth rejected \u2192 big centered gate, nothing else.
+  if (!ACCESS_KEY || authError) {
+    renderGate();
+    return;
   }
-  document.body.appendChild(e);
+
+  // Key present but Lua not connected \u2192 status bar + connected-empty + loader card.
+  renderStatusbar();
+  renderEmptyConnected();
+  renderLoaderCard();
 }
 
 /* ==========================================================================
