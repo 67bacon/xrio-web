@@ -1049,10 +1049,9 @@ function buildToggle(ctrl) {
   row.appendChild(pill);
 
   const update = (v) => {
-    // Guard here too: any repeated set of the same value would otherwise
-    // restart the stripe animation.
     const on = !!v;
-    if (row.classList.contains('on') === on) return;
+    const had = row.classList.contains('on');
+    if (had === on) return;
     row.classList.toggle('on', on);
   };
 
