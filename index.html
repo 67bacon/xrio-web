@@ -979,15 +979,19 @@ function connect() {
       schema = msg.schema || [];
       flags  = msg.flags  || {};
       setStatus(true, luaConnected);
+      adoptVisibility();
       rebuildIfSchemaChanged();
       applyAllFlags();
+      applyVisibility(lastVisibility);
     } else if (msg.type === 'lua_connected') {
       luaConnected = true;
       schema = msg.schema || schema;
       flags  = msg.flags  || flags;
       setStatus(true, true);
+      adoptVisibility();
       rebuildIfSchemaChanged();
       applyAllFlags();
+      applyVisibility(lastVisibility);
     } else if (msg.type === 'lua_disconnected') {
       luaConnected = false;
       setStatus(true, false);
@@ -1584,6 +1588,15 @@ function rebuildIfSchemaChanged() {
 // flag -> the row element, so visibility can be driven from the script.
 const rowRefs = new Map();
 let lastVisibility = {};
+
+// The broker caches every flag the script sends, `_visibility` included, and
+// replays them in the hello/lua_connected snapshot. Without this a page opened
+// (or reconnected) after the script published its map would never see it — the
+// one-off 'flag' message had already been and gone.
+function adoptVisibility() {
+  if (flags && flags._visibility && typeof flags._visibility === 'object')
+    lastVisibility = flags._visibility;
+}
 
 function applyVisibility(map) {
   lastVisibility = map || {};
