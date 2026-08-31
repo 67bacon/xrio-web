@@ -844,43 +844,17 @@ function setStatus(brokerConnected, lua) {
 /* ==========================================================================
    WEBSOCKET — same protocol as before
    ========================================================================== */
-let reconnectTimer = null;
-let reconnectDelay = 1000;
-
-// Reconnect through here, never by calling connect() from a timer directly:
-// onclose used to schedule a fresh connect() unconditionally, so a flapping
-// network could leave several sockets alive at once, each registering its own
-// onclose — the same pile-up the Lua client had. Also backs off, because the
-// broker runs on the user's own PC and is simply down whenever that PC is off;
-// a fixed 1s retry meant tens of thousands of pointless dials overnight.
-function scheduleReconnect() {
-  if (reconnectTimer) return;
-  reconnectTimer = setTimeout(() => {
-    reconnectTimer = null;
-    connect();
-  }, reconnectDelay);
-  reconnectDelay = Math.min(reconnectDelay * 1.7, 30000);
-}
-
 function connect() {
   // Don't bother dialing the broker without a key — show the gate instead.
   if (!ACCESS_KEY) { showEmpty(); return; }
-  // A socket that is still CONNECTING or OPEN must be torn down first,
-  // otherwise this one stacks on top of it.
-  if (ws) {
-    try { ws.onclose = null; ws.onerror = null; ws.close(); } catch {}
-    ws = null;
-  }
-  if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
   try {
     ws = new WebSocket(WS_URL);
   } catch (err) {
     setStatus(false, false);
-    scheduleReconnect();
+    setTimeout(connect, 2000);
     return;
   }
   ws.onopen = () => {
-    reconnectDelay = 1000;          // a good connection resets the backoff
     setStatus(true, luaConnected);
     ws.send(JSON.stringify({ type: 'hello', role: 'ui', key: ACCESS_KEY }));
   };
@@ -894,7 +868,7 @@ function connect() {
       showEmpty();
       return;
     }
-    scheduleReconnect();
+    setTimeout(connect, 1000);
   };
   ws.onerror = () => {};
   ws.onmessage = (ev) => {
