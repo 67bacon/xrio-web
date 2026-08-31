@@ -4,8 +4,10 @@
     fetches script.lua from the broker over the public Cloudflare tunnel,
     and executes it. No per-customer file, no embedded secrets.
 
-    Usage (paste in executor):
-        _G._XRIO_KEY="xrio_xxx";loadstring(game:HttpGet("https://xrio-web.vercel.app/loader.lua"))()
+    Usage (paste in executor) — the ..tick() is REQUIRED, not decoration:
+    executors cache HttpGet by URL and ignore Cache-Control, so a fixed URL
+    keeps serving a months-old copy of this file with a dead BROKER baked in.
+        _G._XRIO_KEY="xrio_xxx";loadstring(game:HttpGet("https://xrio-web.vercel.app/loader.lua?v="..tick()))()
 ]]
 local BROKER = "https://conducting-optimize-rates-strings.trycloudflare.com"  -- auto-synced by auto_sync_tunnel.py
 
