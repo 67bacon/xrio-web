@@ -362,6 +362,10 @@ body {
   margin-top: -1px;
 }
 .ctrl-row__label { flex: 1; min-width: 0; }
+/* The base .ctrl-row__name carries flex:1 so a bare name fills the row. Inside
+   a label that also holds a RISK chip that pushed the chip to the far right,
+   where it collided with the toggle pill — the chip belongs next to the text. */
+.ctrl-row__label .ctrl-row__name { flex: 0 1 auto; }
 .ctrl-row__risk {
   font-size: 8.5px; font-weight: 700; letter-spacing: 0.08em;
   color: #fbbf24;
@@ -1445,7 +1449,6 @@ function buildPanel(tab, controls, index, total) {
       secBody.appendChild(row);
       controlRefs.set(c.flag, update);
       rowRefs.set(c.flag, row);
-      if (lastVisibility[c.flag] === false) row.hidden = true;
     }
 
     if (sectionName) {
@@ -1570,6 +1573,11 @@ function rebuildIfSchemaChanged() {
     panel.style.top  = pos.top  + 'px';
     root.appendChild(panel);
   });
+
+  // A rebuild throws away every row, so the collapse summaries go with them.
+  // Re-derive them from the last map the script sent instead of waiting for the
+  // next Aim Mode change, which may never come.
+  if (Object.keys(lastVisibility).length) applyVisibility(lastVisibility);
 }
 
 /* Push current `flags` into every control once after a rebuild. */
