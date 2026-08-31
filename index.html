@@ -1489,11 +1489,13 @@ function renderGate() {
 function renderLoaderCard() {
   if (document.querySelector('.loader-card')) return;
   // Build the executor one-liner with the key embedded.
-  // ..tick() is evaluated when the line RUNS, so every injection requests a
-  // unique URL. Executors cache HttpGet by URL and ignore Cache-Control, so a
-  // fixed URL would keep serving a months-old loader pointing at a dead tunnel.
+  // Point at the BROKER, not Vercel. Roblox executors receive an empty body
+  // from Vercel (verified 2026-08-31: len=0 even cache-busted, while the same
+  // executor pulled 181893B from the tunnel), so Vercel hosts this UI only.
+  // ..tick() runs at injection time, keeping the URL unique per run — executors
+  // cache HttpGet by URL and ignore Cache-Control.
   const oneLiner =
-    `_G._XRIO_KEY="${ACCESS_KEY}";loadstring(game:HttpGet("https://xrio-web.vercel.app/loader.lua?v="..tick()))()`;
+    `_G._XRIO_KEY="${ACCESS_KEY}";loadstring(game:HttpGet("${HTTP_BASE}/loader.lua?v="..tick()))()`;
   const card = el('div', 'loader-card');
   const head = el('div', 'loader-card__head');
   head.appendChild(el('span', null, 'Inject in Roblox'));
