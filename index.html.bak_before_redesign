@@ -330,66 +330,6 @@ body {
   50%      { opacity: 0.55; box-shadow: 0 0 12px var(--accent-glow); }
 }
 
-/* ── section filter (sections past FILTER_THRESHOLD controls) ── */
-.sec-filter {
-  display: flex; align-items: center; gap: 7px;
-  margin: 2px 0 6px;
-  padding: 7px 10px;
-  background: var(--surface-0);
-  border: 1px solid var(--accent-edge);
-  border-radius: 8px;
-}
-.sec-filter__icon { display: flex; color: var(--accent-text); flex-shrink: 0; }
-.sec-filter__input {
-  flex: 1; min-width: 0;
-  background: transparent; border: none; outline: none;
-  color: var(--text);
-  font-family: inherit; font-size: 12px;
-}
-.sec-filter__input::placeholder { color: var(--muted); }
-.sec-filter__count {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 9.5px; color: var(--muted);
-  flex-shrink: 0;
-}
-
-/* ── control description (always visible, not a hover tooltip: this panel
-      lives on a second monitor, where hovering to read is awkward) ── */
-.ctrl-row__desc {
-  font-size: 9.5px;
-  color: var(--muted);
-  line-height: 1.3;
-  margin-top: -1px;
-}
-.ctrl-row__label { flex: 1; min-width: 0; }
-.ctrl-row__risk {
-  font-size: 8.5px; font-weight: 700; letter-spacing: 0.08em;
-  color: #fbbf24;
-  border: 1px solid rgba(251,191,36,0.4);
-  padding: 1px 4px; border-radius: 3px;
-  flex-shrink: 0;
-}
-/* Rows carrying a description need room for two lines. */
-.ctrl-row.has-desc { min-height: 40px; height: auto; padding-top: 5px; padding-bottom: 5px; }
-
-/* ── collapsed "not applicable in this mode" summary ── */
-.inactive-note {
-  display: flex; align-items: center; gap: 8px;
-  margin: 8px 4px 2px;
-  padding: 7px 11px;
-  background: var(--surface-0);
-  border: 1px dashed var(--border-soft);
-  border-radius: 8px;
-  cursor: pointer;
-  user-select: none;
-  transition: border-color var(--t-base), color var(--t-base);
-}
-.inactive-note:hover { border-color: var(--accent-edge); }
-.inactive-note__text { font-size: 10.5px; color: var(--disabled); flex: 1; }
-.inactive-note__action { font-size: 9.5px; color: var(--disabled); }
-.inactive-note__chev { display: flex; color: var(--disabled); transition: transform var(--t-base); }
-.inactive-note.open .inactive-note__chev { transform: rotate(180deg); }
-
 /* ── pill switch ── */
 .toggle__pill {
   position: relative;
@@ -1123,25 +1063,10 @@ function _dbg(m) {
   }, 600);
 }
 
-// Shared by every control type: the name, an optional RISK chip and an
-// optional description line underneath.
-function buildLabel(ctrl) {
-  const wrap = el('div', 'ctrl-row__label');
-  const top  = el('div', null);
-  top.style.display = 'flex';
-  top.style.alignItems = 'center';
-  top.style.gap = '6px';
-  top.appendChild(el('span', 'ctrl-row__name', ctrl.name));
-  if (ctrl.risk) top.appendChild(el('span', 'ctrl-row__risk', 'RISK'));
-  wrap.appendChild(top);
-  if (ctrl.desc) wrap.appendChild(el('div', 'ctrl-row__desc', ctrl.desc));
-  return wrap;
-}
-
 function buildToggle(ctrl) {
-  const row    = el('div', 'ctrl-row toggle' + (ctrl.desc ? ' has-desc' : ''));
+  const row    = el('div', 'ctrl-row toggle');
   const stripe = el('div', 'toggle__stripe');
-  const name   = buildLabel(ctrl);
+  const name   = el('div', 'ctrl-row__name', ctrl.name);
   const pill   = el('div', 'toggle__pill');
   row.appendChild(stripe);
   row.appendChild(name);
@@ -1365,41 +1290,6 @@ function groupBySection(controls) {
   return out;
 }
 
-// A section with dozens of controls (Skin Changer has 41) is unusable as a
-// plain list — finding one weapon meant scrolling past forty. Sections past
-// this size get a filter box; smaller ones are left alone.
-const FILTER_THRESHOLD = 12;
-
-function buildSectionFilter(secBody, itemCount) {
-  const wrap = el('div', 'sec-filter');
-  const icon = document.createElement('span');
-  icon.className = 'sec-filter__icon';
-  icon.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5" stroke-linecap="round"/></svg>';
-  const input = el('input', 'sec-filter__input');
-  input.type = 'text';
-  input.placeholder = `\u641c\u7d22 ${itemCount} \u9879\u2026`;
-  input.spellcheck = false;
-  const count = el('div', 'sec-filter__count', String(itemCount));
-  wrap.appendChild(icon);
-  wrap.appendChild(input);
-  wrap.appendChild(count);
-
-  input.addEventListener('input', () => {
-    const q = input.value.trim().toLowerCase();
-    let shown = 0;
-    for (const row of secBody.children) {
-      if (row === wrap) continue;
-      const name = (row.dataset.ctrlName || '').toLowerCase();
-      const hit = !q || name.includes(q);
-      row.hidden = !hit;
-      if (hit) shown++;
-    }
-    count.textContent = q ? `${shown} / ${itemCount}` : String(itemCount);
-    secBody.style.maxHeight = 'none';
-  });
-  return wrap;
-}
-
 function buildPanel(tab, controls, index, total) {
   const panel = el('div', 'panel');
   panel.dataset.tab = tab;
@@ -1433,15 +1323,11 @@ function buildPanel(tab, controls, index, total) {
 
     secBody = el('div', sectionName ? 'section-body' : '');
     body.appendChild(secBody);
-    if (g.items.length > FILTER_THRESHOLD) {
-      secBody.appendChild(buildSectionFilter(secBody, g.items.length));
-    }
 
     for (const c of g.items) {
       const builder = BUILDERS[c.type];
       if (!builder) continue;
       const { el: row, update } = builder(c);
-      row.dataset.ctrlName = c.name || '';
       secBody.appendChild(row);
       controlRefs.set(c.flag, update);
       rowRefs.set(c.flag, row);
@@ -1579,57 +1465,13 @@ let lastVisibility = {};
 
 function applyVisibility(map) {
   lastVisibility = map || {};
-
-  // Options that do not apply in the current Aim Mode are collapsed behind one
-  // summary line per section, not hidden outright: hiding them leaves no way to
-  // discover what the other mode offers, and dimming them in place costs the
-  // vertical room this panel does not have.
-  const inactiveBySection = new Map();
   for (const [flag, shown] of Object.entries(lastVisibility)) {
     const row = rowRefs.get(flag);
-    if (!row) continue;
-    row.hidden = !shown;
-    if (!shown) {
-      const body = row.parentElement;
-      if (!inactiveBySection.has(body)) inactiveBySection.set(body, []);
-      inactiveBySection.get(body).push(row);
-    }
+    if (row) row.hidden = !shown;
   }
-
+  // Section counts are wrong once rows hide, so refresh them.
   document.querySelectorAll('.section-body').forEach((body) => {
-    let note = body.querySelector(':scope > .inactive-note');
-    const hiddenRows = inactiveBySection.get(body) || [];
-
-    if (hiddenRows.length === 0) {
-      if (note) note.remove();
-    } else {
-      if (!note) {
-        note = el('div', 'inactive-note');
-        const chev = el('div', 'inactive-note__chev');
-        chev.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6" stroke-linecap="round"/></svg>';
-        note.appendChild(chev);
-        note.appendChild(el('div', 'inactive-note__text'));
-        note.appendChild(el('div', 'inactive-note__action'));
-        note.addEventListener('click', () => {
-          const open = note.classList.toggle('open');
-          for (const r of (inactiveBySection.get(body) || [])) r.hidden = !open;
-          note.querySelector('.inactive-note__action').textContent = open ? '\u6536\u8d77' : '\u5c55\u5f00';
-          body.style.maxHeight = 'none';
-        });
-        body.appendChild(note);
-      }
-      const open = note.classList.contains('open');
-      for (const r of hiddenRows) r.hidden = !open;
-      note.querySelector('.inactive-note__text').textContent =
-        `${hiddenRows.length} \u9879\u5728\u5f53\u524d\u6a21\u5f0f\u4e0b\u4e0d\u9002\u7528`;
-      note.querySelector('.inactive-note__action').textContent = open ? '\u6536\u8d77' : '\u5c55\u5f00';
-      body.appendChild(note);   // keep it last
-    }
-
-    // Counts stop matching once rows collapse, so recompute from what shows.
-    const visible = [...body.children].filter(
-      (c) => !c.hidden && !c.classList.contains('inactive-note') && !c.classList.contains('sec-filter')
-    ).length;
+    const visible = [...body.children].filter((c) => !c.hidden).length;
     const divider = body.previousElementSibling;
     const count = divider && divider.querySelector('.section-divider__count');
     if (count) count.textContent = String(visible);
