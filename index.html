@@ -652,6 +652,34 @@ body {
   color: #ffb0b0;
   font-size: 11px;
 }
+/* ── free self-serve signup (script is free; keys only separate sessions) ── */
+.gate__divider {
+  display: flex; align-items: center; gap: 10px;
+  margin: 16px 0 12px;
+  color: var(--muted); font-size: 10px; letter-spacing: 0.14em;
+}
+.gate__divider::before, .gate__divider::after {
+  content: ''; flex: 1; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent-edge), transparent);
+}
+.gate__alt {
+  display: block; width: 100%;
+  padding: 10px;
+  background: transparent;
+  color: var(--accent-text);
+  border: 1px dashed var(--accent-edge);
+  border-radius: 10px;
+  font-family: inherit; font-size: 12px; font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background var(--t-base), transform var(--t-base);
+}
+.gate__alt:hover { background: rgba(255,255,255,0.04); transform: translateY(-1px); }
+.gate__alt:disabled { opacity: 0.55; cursor: default; transform: none; }
+.gate__note {
+  margin-top: 10px;
+  color: var(--muted); font-size: 10.5px; line-height: 1.5;
+}
 
 /* ── loader command card (shown after auth, bottom-right) ── */
 .loader-card {
@@ -745,6 +773,9 @@ const WS_URL = (() => {
   if (h === 'localhost' || h === '127.0.0.1' || h === '') return `ws://${location.host}/`;
   return 'wss://' + TUNNEL_DEFAULT + '/';
 })();
+
+// Same broker over plain HTTP, for the REST endpoints (/api/signup).
+const HTTP_BASE = WS_URL.replace(/^ws/, 'http').replace(/\/$/, '');
 
 // Customer key resolution: ?key= (URL) → localStorage → empty (prompt in UI)
 let ACCESS_KEY = (() => {
@@ -1395,12 +1426,12 @@ function renderGate() {
   const sub = el('div', 'gate__sub');
   if (authError) {
     sub.textContent =
-      authError === 'expired'  ? 'Your key has expired. Contact the owner to renew.' :
+      authError === 'expired'  ? 'That key has expired — just grab a fresh free one below.' :
       authError === 'revoked'  ? 'Your key was revoked.' :
       authError === 'unknown key' ? 'That key is invalid. Try again.' :
       ('Auth failed: ' + authError);
   } else {
-    sub.textContent = 'No key? Buy one from the owner. Without a valid key, the UI does nothing.';
+    sub.textContent = 'Already have a key? Paste it below. Otherwise grab a free one.';
   }
   g.appendChild(sub);
   const input = el('input', 'gate__input');
@@ -1413,6 +1444,17 @@ function renderGate() {
   g.appendChild(input);
   const btn = el('button', 'gate__btn', 'Connect');
   g.appendChild(btn);
+
+  // \u2500\u2500 free self-serve key \u2500\u2500
+  // xrio is free. A key still exists per person because broker sessions are
+  // keyed by it \u2014 sharing one key would make users boot each other offline.
+  g.appendChild(el('div', 'gate__divider', 'OR'));
+  const claim = el('button', 'gate__alt', 'Get a free key');
+  g.appendChild(claim);
+  const note = el('div', 'gate__note',
+    'Free forever. Your key is saved in this browser \u2014 keep it if you want the same session back.');
+  g.appendChild(note);
+
   wrap.appendChild(g);
   document.body.appendChild(wrap);
   setTimeout(() => input.focus(), 80);
@@ -1424,6 +1466,24 @@ function renderGate() {
   };
   btn.addEventListener('click', submit);
   input.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') submit(); });
+
+  claim.addEventListener('click', async () => {
+    claim.disabled = true;
+    claim.textContent = 'Creating\u2026';
+    try {
+      const nm  = (prompt('Pick a name (so you can spot your session):', '') || '').trim();
+      const res = await fetch(HTTP_BASE + '/api/signup?name=' + encodeURIComponent(nm),
+                              { cache: 'no-store' });
+      const j   = await res.json();
+      if (!res.ok || !j.key) throw new Error(j.error || ('HTTP ' + res.status));
+      note.textContent = 'Your key: ' + j.key + ' \u2014 saved. Connecting\u2026';
+      setAccessKey(j.key);
+    } catch (e) {
+      claim.disabled = false;
+      claim.textContent = 'Get a free key';
+      note.textContent = 'Could not create a key: ' + e.message;
+    }
+  });
 }
 
 function renderLoaderCard() {
