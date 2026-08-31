@@ -9,7 +9,7 @@
     keeps serving a months-old copy of this file with a dead BROKER baked in.
         _G._XRIO_KEY="xrio_xxx";loadstring(game:HttpGet("https://xrio-web.vercel.app/loader.lua?v="..tick()))()
 ]]
-local BROKER = "https://conducting-optimize-rates-strings.trycloudflare.com"  -- auto-synced by auto_sync_tunnel.py
+local BROKER = "https://grand-invitations-boat-formed.trycloudflare.com"  -- auto-synced by auto_sync_tunnel.py
 
 local key = (_G._XRIO_KEY or ""):gsub("%s+", "")
 if key == "" then
