@@ -929,8 +929,13 @@ function connect() {
       setStatus(true, false);
       showEmpty();
     } else if (msg.type === 'flag') {
+      // The Lua side echoes every flag back, including the one this page just
+      // set. Re-applying an unchanged value re-ran the control's update and
+      // replayed its animation, so a single click looked like two.
+      const prev = flags[msg.flag];
+      const same = JSON.stringify(prev) === JSON.stringify(msg.value);
       flags[msg.flag] = msg.value;
-      if (msg.flag !== draggingFlag) {
+      if (!same && msg.flag !== draggingFlag) {
         const fn = controlRefs.get(msg.flag);
         if (fn) fn(msg.value);
       }
@@ -1044,7 +1049,11 @@ function buildToggle(ctrl) {
   row.appendChild(pill);
 
   const update = (v) => {
-    row.classList.toggle('on', !!v);
+    // Guard here too: any repeated set of the same value would otherwise
+    // restart the stripe animation.
+    const on = !!v;
+    if (row.classList.contains('on') === on) return;
+    row.classList.toggle('on', on);
   };
 
   row.addEventListener('click', () => {
