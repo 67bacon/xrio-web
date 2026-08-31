@@ -7,7 +7,7 @@
     Usage (paste in executor):
         _G._XRIO_KEY="xrio_xxx";loadstring(game:HttpGet("https://xrio-web.vercel.app/loader.lua"))()
 ]]
-local BROKER = "https://respectively-sms-expired-lenses.trycloudflare.com"  -- auto-synced by auto_sync_tunnel.py
+local BROKER = "https://conducting-optimize-rates-strings.trycloudflare.com"  -- auto-synced by auto_sync_tunnel.py
 
 local key = (_G._XRIO_KEY or ""):gsub("%s+", "")
 if key == "" then
