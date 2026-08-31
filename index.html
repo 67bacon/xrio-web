@@ -928,6 +928,13 @@ function connect() {
       luaConnected = false;
       setStatus(true, false);
       showEmpty();
+    } else if (msg.type === 'flag' && msg.flag === '_visibility') {
+      // Not a real control — the script uses this to say which options apply
+      // in the current Aim Mode. Options that do nothing in the active mode
+      // used to sit there looking usable (Wallbang (RCL) is Right Click Lock
+      // only, Auto Shoot is Silent Aim only), which is the main reason the
+      // panel read as cluttered.
+      applyVisibility(msg.value || {});
     } else if (msg.type === 'flag') {
       // The Lua side echoes every flag back, including the one this page just
       // set. Re-applying an unchanged value re-ran the control's update and
@@ -935,9 +942,10 @@ function connect() {
       const prev = flags[msg.flag];
       const same = JSON.stringify(prev) === JSON.stringify(msg.value);
       flags[msg.flag] = msg.value;
+      if (msg.flag === _watchFlag) _dbg(`ECHO ${msg.flag} prev=${JSON.stringify(prev)} new=${JSON.stringify(msg.value)} same=${same}`);
       if (!same && msg.flag !== draggingFlag) {
         const fn = controlRefs.get(msg.flag);
-        if (fn) fn(msg.value);
+        if (fn) fn(msg.value, 'echo');
       }
     }
   };
@@ -1039,6 +1047,22 @@ function initialLayout(count, panelW = 280, gap = 16) {
    CONTROL BUILDERS — each returns {el, update}.
    `update(value)` mutates the row IN PLACE; no DOM recreation.
    ========================================================================== */
+// TEMPORARY: trace exactly what touches a toggle's visual state. The earlier
+// echo-dedupe fix did not stop the replay, so this records every path that can
+// add or remove the `on` class, plus a stack hint, batched and numbered so the
+// order is readable.
+let _watchFlag = null;
+let _t0 = Date.now(), _sq = 0, _buf = [], _tm = null;
+function _dbg(m) {
+  _buf.push(`${++_sq}@${Date.now() - _t0}ms ${m}`);
+  if (_tm) return;
+  _tm = setTimeout(() => {
+    const p = _buf.join(' | '); _buf = []; _tm = null;
+    try { fetch(HTTP_BASE + '/api/diag?msg=' + encodeURIComponent('[web] ' + p),
+                { cache: 'no-store', mode: 'cors' }); } catch {}
+  }, 600);
+}
+
 function buildToggle(ctrl) {
   const row    = el('div', 'ctrl-row toggle');
   const stripe = el('div', 'toggle__stripe');
@@ -1048,17 +1072,21 @@ function buildToggle(ctrl) {
   row.appendChild(name);
   row.appendChild(pill);
 
-  const update = (v) => {
+  const update = (v, src) => {
     const on = !!v;
     const had = row.classList.contains('on');
+    if (ctrl.flag === _watchFlag)
+      _dbg(`update(${src||'?'}) ${ctrl.flag} ${had}->${on} ${had===on?'SKIP':'APPLY'}`);
     if (had === on) return;
     row.classList.toggle('on', on);
   };
 
   row.addEventListener('click', () => {
     const next = !flags[ctrl.flag];
+    if (!_watchFlag) _watchFlag = ctrl.flag;   // trace only the first one clicked
+    if (ctrl.flag === _watchFlag) _dbg(`CLICK ${ctrl.flag} -> ${next}`);
     flags[ctrl.flag] = next;
-    update(next);
+    update(next, 'click');
     send({ type: 'set_flag', flag: ctrl.flag, value: next });
   });
 
@@ -1302,6 +1330,8 @@ function buildPanel(tab, controls, index, total) {
       const { el: row, update } = builder(c);
       secBody.appendChild(row);
       controlRefs.set(c.flag, update);
+      rowRefs.set(c.flag, row);
+      if (lastVisibility[c.flag] === false) row.hidden = true;
     }
 
     if (sectionName) {
@@ -1401,6 +1431,7 @@ function rebuildIfSchemaChanged() {
   // Wipe
   root.innerHTML = '';
   controlRefs.clear();
+  rowRefs.clear();
 
   // Group by tab in insertion order
   const tabs = [];
@@ -1428,9 +1459,29 @@ function rebuildIfSchemaChanged() {
 }
 
 /* Push current `flags` into every control once after a rebuild. */
+// flag -> the row element, so visibility can be driven from the script.
+const rowRefs = new Map();
+let lastVisibility = {};
+
+function applyVisibility(map) {
+  lastVisibility = map || {};
+  for (const [flag, shown] of Object.entries(lastVisibility)) {
+    const row = rowRefs.get(flag);
+    if (row) row.hidden = !shown;
+  }
+  // Section counts are wrong once rows hide, so refresh them.
+  document.querySelectorAll('.section-body').forEach((body) => {
+    const visible = [...body.children].filter((c) => !c.hidden).length;
+    const divider = body.previousElementSibling;
+    const count = divider && divider.querySelector('.section-divider__count');
+    if (count) count.textContent = String(visible);
+  });
+}
+
 function applyAllFlags() {
+  if (_watchFlag) _dbg('applyAllFlags()');
   for (const [flag, fn] of controlRefs.entries()) {
-    if (flags[flag] !== undefined) fn(flags[flag]);
+    if (flags[flag] !== undefined) fn(flags[flag], 'applyAll');
   }
 }
 
