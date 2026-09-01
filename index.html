@@ -947,10 +947,16 @@ function markPending(flag, value) {
   pending.set(flag, entry);
 }
 
+/* A dropdown value goes out as a string and comes back as a one-item list. */
+function sameValue(a, b) {
+  const norm = (v) => (Array.isArray(v) && v.length === 1) ? v[0] : v;
+  return JSON.stringify(norm(a)) === JSON.stringify(norm(b));
+}
+
 function isStaleEcho(flag, value) {
   const entry = pending.get(flag);
   if (!entry) return false;
-  if (JSON.stringify(entry.value) === JSON.stringify(value)) {
+  if (sameValue(entry.value, value)) {
     clearTimeout(entry.timer);
     pending.delete(flag);       // confirmed — later echoes are honoured again
     return true;                // already painted at click time
@@ -1264,6 +1270,7 @@ function buildSegmented(ctrl) {
       flags[ctrl.flag] = o;
       update(o);
       applyShowWhen();
+      markPending(ctrl.flag, o);
       send({ type: 'set_flag', flag: ctrl.flag, value: o });
     });
     segs.appendChild(b);
@@ -1340,6 +1347,7 @@ function buildDropdown(ctrl) {
       flags[ctrl.flag] = v;
       update(v);
       applyShowWhen();          // before the round trip, not after it
+      markPending(ctrl.flag, v);
       send({ type: 'set_flag', flag: ctrl.flag, value: v });
       row.classList.remove('open');
       menu.style.display = 'none';
