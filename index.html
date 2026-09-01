@@ -208,8 +208,12 @@ body {
   max-height: 0;
   overflow: hidden;
   opacity: 0;
-  transition: max-height 0.26s var(--ease), opacity 0.2s var(--ease),
-              padding 0.26s var(--ease);
+  /* padding deliberately NOT transitioned: it is applied by .open, and while it
+     was animating from 0 the height measured for the open animation came out
+     22px short — exactly the two paddings — so the last row sat clipped until
+     the cleanup replaced max-height with none. Nothing is visible during the
+     collapse anyway, so applying it instantly costs no smoothness. */
+  transition: max-height 0.26s var(--ease), opacity 0.2s var(--ease);
   will-change: max-height;
 }
 .section-body.open { opacity: 1; padding: 11px; }
@@ -1488,7 +1492,14 @@ function buildPanel(tab, controls, index, total) {
   const openSection = (s) => {
     s.divider.classList.add('open');
     s.secBody.classList.add('open');
+    // Measure with the constraint lifted. Reading scrollHeight straight after
+    // adding .open gave a height that excluded the padding that class brings
+    // (it is itself transitioned), so the target was short and the last row sat
+    // clipped until the 320ms cleanup replaced max-height with none.
+    s.secBody.style.maxHeight = 'none';
     const h = s.secBody.scrollHeight;
+    s.secBody.style.maxHeight = '0px';
+    void s.secBody.offsetHeight;      // flush, so the transition has a start value
     s.secBody.style.maxHeight = h + 'px';
     // After transition completes, remove px constraint so content can grow
     clearTimeout(s._cleanup);
