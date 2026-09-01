@@ -1361,8 +1361,16 @@ function buildPanel(tab, controls, index, total) {
     secBody = el('div', sectionName ? 'section-body' : '');
     body.appendChild(secBody);
     if (g.items.length > FILTER_THRESHOLD) {
-      secBody.classList.add('two-col');
       secBody.appendChild(buildSectionFilter(secBody, g.items.length));
+    }
+    // Narrow rows only where a section is a long LIST of the same thing — the
+    // skin dropdowns. Keying this off item count alone put Aimbot (13 items,
+    // mixed types) into two columns, where a dropdown sits beside a tile: the
+    // value truncated to "Screen Distanc", the descriptions wrapped to three
+    // lines, and the two columns ended up wildly different heights.
+    const dd = g.items.filter((c) => c.type === 'dropdown').length;
+    if (dd > FILTER_THRESHOLD && dd / g.items.length >= 0.8) {
+      secBody.classList.add('two-col');
     }
 
     for (const c of g.items) {
