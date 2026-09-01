@@ -404,6 +404,16 @@ body {
 }
 
 /* ── section search (large sections only) ── */
+/* A section big enough to need a search box (the 20+ skin dropdowns) is also
+   the one where full-width rows waste the most vertical space: two columns
+   fits the whole list on screen instead of a third of it. Ordinary sections
+   keep full-width rows, because there the dropdown sits beside a tile and the
+   weapon name gets truncated — measured both ways before choosing. */
+.section-body.two-col .dropdown-wrap { grid-column: span 1; }
+.section-body.two-col .dropdown { padding: 10px; gap: 6px; }
+.section-body.two-col .dropdown__value { max-width: 96px; font-size: 10.5px; padding: 4px 7px; }
+.section-body.two-col .ctrl-row__name { font-size: 12px; }
+
 .sec-filter {
   grid-column: 1 / -1;
   display: flex; align-items: center; gap: 9px;
@@ -1351,6 +1361,7 @@ function buildPanel(tab, controls, index, total) {
     secBody = el('div', sectionName ? 'section-body' : '');
     body.appendChild(secBody);
     if (g.items.length > FILTER_THRESHOLD) {
+      secBody.classList.add('two-col');
       secBody.appendChild(buildSectionFilter(secBody, g.items.length));
     }
 
