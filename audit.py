@@ -84,6 +84,12 @@ with sync_playwright() as pw:
     check("dropdown sends set_flag", any(m.get('flag')=='ChamsColor' and m.get('value')=='Blue' for m in sent), sent)
 
     print("\n--- dropdown echo (Lua returns a LIST) ---")
+    # The confirming echo has to land first. A non-matching value arriving while
+    # a click is still unconfirmed is a stale echo by definition and is dropped
+    # on purpose — that is what stops two quick picks replaying themselves.
+    p.evaluate("""() => window.__ws_onmessage({data: JSON.stringify(
+        {type:'flag', flag:'ChamsColor', value:['Blue']})})""")
+    p.wait_for_timeout(100)
     p.evaluate("""() => window.__ws_onmessage({data: JSON.stringify(
         {type:'flag', flag:'ChamsColor', value:['Cyan']})})""")
     p.wait_for_timeout(200)
