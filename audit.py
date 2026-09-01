@@ -148,8 +148,16 @@ with sync_playwright() as pw:
     check("no panel off-screen", not off, off)
 
     print("\n--- segmented (few short options) ---")
-    check("Wallbang renders inline, not as a popup", p.evaluate("""() =>
-        !![...document.querySelectorAll('.segmented')].find(e=>e.textContent.includes('Wallbang'))"""))
+    p.evaluate("""() => {
+        schema.push({type:'dropdown', tab:'Movement', section:'MOVEMENT', name:'Strafe Mode',
+          flag:'StrafeModeDropdown', segmented:true,
+          options:['Auto','Pure Sideways','Keep Forward']});
+        flags['StrafeModeDropdown']='Auto';
+        schemaSig=''; rebuildIfSchemaChanged(); applyAllFlags(); }""")
+    check("a control that opts in renders inline", p.evaluate("""() =>
+        !![...document.querySelectorAll('.segmented')].find(e=>e.textContent.includes('Strafe Mode'))"""))
+    check("a control that does NOT opt in stays a popup", p.evaluate("""() =>
+        !![...document.querySelectorAll('.dropdown')].find(e=>e.textContent.includes('Wallbang'))"""))
     check("many-option list stays a popup", p.evaluate("""() =>
         !![...document.querySelectorAll('.dropdown')].find(e=>e.textContent.includes('Chams Color'))"""))
 

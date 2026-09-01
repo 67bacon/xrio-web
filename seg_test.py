@@ -8,7 +8,7 @@ with sync_playwright() as pw:
     p.evaluate(open("audit_schema.js").read())
     p.evaluate("""() => {
       schema.push({type:'dropdown', tab:'Movement', section:'MOVEMENT', name:'Strafe Mode',
-        flag:'StrafeModeDropdown', options:['Auto','Pure Sideways','Keep Forward'],
+        flag:'StrafeModeDropdown', segmented:true, options:['Auto','Pure Sideways','Keep Forward'],
         desc:'Auto=按A/D时才松W(推荐)；纯横向=一律松W最快但会侧飘；保留前进=永不松W最慢'});
       flags['StrafeModeDropdown']='Auto';
       schemaSig=''; rebuildIfSchemaChanged(); applyAllFlags();

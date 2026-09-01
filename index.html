@@ -1280,10 +1280,12 @@ function buildSegmented(ctrl) {
 
 function buildDropdown(ctrl) {
   const opts = ctrl.options || [];
-  // Not in a two-column section: half a panel is not wide enough for a name
-  // plus three pills, and a long list of them (the skins) reads worse than a
-  // column of compact popups.
-  if (opts.length && opts.length <= SEGMENT_MAX_OPTIONS && !ctrl._inTwoCol &&
+  // Opt-in, declared per control in the schema. Applying it to every short
+  // list changed Aim Mode, Target Priority and Wallbang as a side effect of a
+  // request about one setting in Movement — a control should not change shape
+  // because of a rule it never asked to be part of.
+  if (ctrl.segmented && opts.length && !ctrl._inTwoCol &&
+      opts.length <= SEGMENT_MAX_OPTIONS &&
       opts.every((o) => String(o).length <= SEGMENT_MAX_CHARS)) {
     return buildSegmented(ctrl);
   }
