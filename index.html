@@ -874,6 +874,10 @@ function connect() {
         const fn = controlRefs.get(msg.flag);
         if (fn) fn(msg.value, 'echo');
       }
+      // A flag that gates another control can change without this panel doing
+      // it — from the in-game UI, or a config load. Only the click path
+      // re-evaluated the rules, so a dependent control stayed as it was.
+      if (!same) applyShowWhen();
     }
   };
 }
@@ -1022,8 +1026,11 @@ function _dbg(m) {
   if (_tm) return;
   _tm = setTimeout(() => {
     const p = _buf.join(' | '); _buf = []; _tm = null;
+    // try/catch does not catch a rejected promise, so an unreachable broker
+    // threw an unhandled rejection on every batch — noise in the console, and
+    // it fires most when something is already wrong.
     try { fetch(HTTP_BASE + '/api/diag?msg=' + encodeURIComponent('[web] ' + p),
-                { cache: 'no-store', mode: 'cors' }); } catch {}
+                { cache: 'no-store', mode: 'cors' }).catch(() => {}); } catch {}
   }, 600);
 }
 
