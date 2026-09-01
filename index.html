@@ -8,588 +8,428 @@
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
 /* ====================================================================
-   XRIO companion — Vape-style multi-panel
-   Glass panels, draggable, per-panel scroll, no central tab sidebar.
+   XRIO companion — block UI
+   Squares, hard edges, zero radius. Toggles are tiles in a two-column
+   grid; anything carrying a *value* (dropdown, slider, keybind) spans
+   the full width, because a tile can only say on/off and those need to
+   show which value is selected.
+
+   No shine sweeps, no gradient fills, no hover transforms. The old
+   .ctrl-row::before swept a highlight left-to-right on hover and then
+   animated it back right-to-left on hover-out — that reverse sweep is
+   what read as a toggle "flipping twice". Motion here is limited to
+   colour, so nothing can travel across a row.
    ==================================================================== */
 :root {
-  --accent:        #a78bfa;
-  --accent-deep:   #7c5cf5;
+  --accent:        #7c6cf0;
+  --accent-deep:   #5a4bd4;
   --accent-text:   #c4b5fd;
-  --accent-soft:   rgba(167, 139, 250, 0.14);
-  --accent-edge:   rgba(167, 139, 250, 0.42);
-  --accent-glow:   rgba(167, 139, 250, 0.55);
+  --accent-soft:   rgba(124, 108, 240, 0.14);
+  --accent-edge:   #7c6cf0;
+  --accent-glow:   rgba(124, 108, 240, 0.45);
 
-  --bg-page:       #07070d;
-  --panel-bg:      rgba(14, 14, 22, 0.74);
-  --titlebar-a:    rgba(34, 28, 56, 0.95);
-  --titlebar-b:    rgba(18, 18, 28, 0.95);
+  --bg-page:       #07070b;
+  --panel-bg:      #0d0d15;
+  --panel-hi:      #12121c;
+  --titlebar-a:    #12121c;
+  --titlebar-b:    #12121c;
 
-  --surface-0:     rgba(10, 10, 18, 0.60);
-  --surface-1:     rgba(22, 22, 34, 0.55);
-  --elem:          rgba(26, 26, 38, 0.55);
-  --elem-hover:    rgba(40, 40, 60, 0.70);
-  --elem-active:   rgba(50, 40, 80, 0.65);
-  --slider-bg:     rgba(10, 10, 18, 0.85);
+  --surface-0:     #0a0a12;
+  --surface-1:     #12121e;
+  --elem:          #12121e;
+  --elem-hover:    #1a1a2c;
+  --elem-active:   #22223a;
+  --slider-bg:     #1a1a2c;
 
-  --text:          #f4f4fb;
-  --subtext:       #a8a8bd;
-  --muted:         #6c6c84;
-  --disabled:      #45455a;
+  --text:          #e8e8f2;
+  --subtext:       #a0a0bc;
+  --muted:         #6a6a84;
+  --disabled:      #4e4e66;
 
-  --border-hair:   rgba(255, 255, 255, 0.04);
-  --border-soft:   rgba(255, 255, 255, 0.07);
-  --border-strong: rgba(255, 255, 255, 0.12);
+  --line:          #23233a;
+  --line-soft:     #1a1a2a;
+  --border-hair:   #1a1a2a;
+  --border-soft:   #23233a;
+  --border-strong: #33334e;
 
-  --shadow-panel:
-    0 1px 0 rgba(255,255,255,0.04) inset,
-    0 30px 60px -20px rgba(0,0,0,0.70),
-    0 8px 24px -8px rgba(0,0,0,0.55);
-  --shadow-panel-glow:
-    0 1px 0 rgba(255,255,255,0.06) inset,
-    0 30px 60px -20px rgba(0,0,0,0.70),
-    0 0 0 1px var(--accent-edge),
-    0 0 32px -8px var(--accent-glow);
+  --risk:          #f0b429;
+  --risk-dim:      #6b5410;
+  --risk-ink:      #1a1400;
+
+  --shadow-panel:      0 18px 40px -18px rgba(0,0,0,0.85);
+  --shadow-panel-glow: 0 18px 40px -18px rgba(0,0,0,0.85), 0 0 0 1px var(--accent-edge);
 
   --ease:    cubic-bezier(0.22, 1, 0.36, 1);
-  --t-fast:  120ms var(--ease);
-  --t-base:  200ms var(--ease);
-  --t-slow:  320ms var(--ease);
+  --t-fast:  100ms var(--ease);
+  --t-base:  150ms var(--ease);
+  --t-slow:  260ms var(--ease);
 }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
+/* The `hidden` attribute is only `display:none` in the UA stylesheet, so any
+   author rule setting display (every control here sets flex/grid/block) wins
+   over it and the element stays on screen. Visibility collapse sets
+   el.hidden, so without this the rows never actually disappear. */
+[hidden] { display: none !important; }
 body {
-  font-family: 'Geist', system-ui, sans-serif;
-  font-size: 13px;
+  background: var(--bg-page);
   color: var(--text);
-  background:
-    radial-gradient(ellipse 80% 60% at 20% 0%,  rgba(124,92,245,0.14), transparent 70%),
-    radial-gradient(ellipse 70% 50% at 100% 100%, rgba(34,211,238,0.06),  transparent 70%),
-    radial-gradient(ellipse 60% 40% at 0% 100%, rgba(244,63,94,0.04),    transparent 70%),
-    var(--bg-page);
+  font-family: 'Geist', system-ui, -apple-system, sans-serif;
+  font-size: 13px;
   min-height: 100vh;
   overflow: hidden;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
-/* ── status bar (top) ── */
+/* ── status bar ── */
 .statusbar {
-  position: fixed;
-  top: 14px; left: 50%;
-  transform: translateX(-50%);
-  z-index: 100;
+  position: fixed; top: 14px; left: 16px;
   display: flex; align-items: center; gap: 10px;
-  padding: 7px 14px 7px 12px;
-  background: rgba(14, 14, 22, 0.78);
-  backdrop-filter: blur(18px) saturate(160%);
-  -webkit-backdrop-filter: blur(18px) saturate(160%);
-  border-radius: 999px;
-  border: 1px solid var(--border-soft);
-  font-size: 11px;
-  color: var(--subtext);
-  letter-spacing: 0.04em;
-  box-shadow: 0 8px 32px -8px rgba(0,0,0,0.5);
-  font-feature-settings: 'tnum';
+  padding: 8px 13px;
+  background: var(--panel-bg);
+  border: 1px solid var(--line);
+  z-index: 60;
+  user-select: none;
 }
-.dot {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: #ff5e5e;
-  box-shadow: 0 0 8px #ff5e5e, 0 0 16px rgba(255,94,94,0.4);
-  transition: all var(--t-base);
-}
-.dot.live {
-  background: #4ade80;
-  box-shadow: 0 0 8px #4ade80, 0 0 16px rgba(74,222,128,0.4);
-}
-.dot.pulse { animation: dotPulse 1.6s ease-in-out infinite; }
-@keyframes dotPulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.85); } }
-
 .brand {
   font-size: 10px;
+  font-weight: 700;
   letter-spacing: 0.22em;
   color: var(--muted);
-  border-left: 1px solid var(--border-soft);
-  padding-left: 10px;
-  margin-left: 4px;
+  border-left: 1px solid var(--line);
+  padding-left: 11px;
+  margin-left: 3px;
 }
-.brand .accent { color: var(--accent-text); }
-
-/* ── panels root ── */
-.panels-root {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
+.dot {
+  width: 7px; height: 7px;
+  background: var(--accent);
 }
+.dot.pulse { animation: dotPulse 1.6s ease-in-out infinite; }
+@keyframes dotPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
 
-/* ── individual panel ── */
+/* ── panel ── */
 .panel {
   position: absolute;
-  width: 280px;
-  pointer-events: auto;
+  width: 440px;
+  max-height: calc(100vh - 40px);
+  display: flex; flex-direction: column;
   background: var(--panel-bg);
-  backdrop-filter: blur(22px) saturate(150%);
-  -webkit-backdrop-filter: blur(22px) saturate(150%);
-  border: 1px solid var(--border-soft);
-  border-radius: 14px;
+  border: 1px solid var(--line);
   box-shadow: var(--shadow-panel);
-  display: flex;
-  flex-direction: column;
-  max-height: calc(100vh - 80px);
-  transition: box-shadow var(--t-base);
-  opacity: 0;
-  transform: translateY(8px);
-  animation: panelIn 0.55s var(--ease) forwards;
-  will-change: transform;
+  animation: panelIn 260ms var(--ease) both;
 }
 @keyframes panelIn {
-  from { opacity: 0; transform: translateY(8px) scale(0.985); }
-  to   { opacity: 1; transform: translateY(0)   scale(1); }
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-.panel:hover,
-.panel.dragging { box-shadow: var(--shadow-panel-glow); }
-.panel.dragging { transition: none; cursor: grabbing; }
-/* Reduce GPU load during drag: kill shine sweep + pulse + backdrop blur */
-.panel.dragging .ctrl-row::before,
-.panel.dragging .toggle.on .toggle__stripe { animation: none !important; }
-.panel.dragging { backdrop-filter: blur(8px) saturate(120%); -webkit-backdrop-filter: blur(8px) saturate(120%); }
+.panel:hover, .panel.dragging { box-shadow: var(--shadow-panel-glow); }
+.panel.dragging { cursor: grabbing; }
 
-/* faint top highlight (like Discord/Steam panels) */
-.panel::before {
-  content: '';
-  position: absolute; inset: 0;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0) 35%);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-          mask-composite: exclude;
-  pointer-events: none;
-}
-
-/* ── titlebar ── */
 .panel-title {
-  position: relative;
-  height: 36px;
-  background: linear-gradient(180deg, var(--titlebar-a) 0%, var(--titlebar-b) 100%);
-  display: flex; align-items: center;
-  padding: 0 14px;
-  gap: 10px;
-  font-weight: 600;
-  font-size: 13px;
-  letter-spacing: 0.01em;
-  border-bottom: 1px solid var(--border-hair);
-  border-radius: 14px 14px 0 0;
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px;
+  background: var(--panel-hi);
+  border-bottom: 1px solid var(--line);
   cursor: grab;
   user-select: none;
-}
-.panel.dragging .panel-title { cursor: grabbing; }
-.panel-title__dot {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 8px var(--accent-glow);
   flex-shrink: 0;
 }
-.panel-title__name { flex: 1; }
+.panel-title__dot { width: 7px; height: 7px; background: var(--accent); flex-shrink: 0; }
+.panel-title__name {
+  flex: 1;
+  font-size: 13.5px; font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .panel-title__count {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  color: var(--muted);
-  background: rgba(255,255,255,0.04);
-  padding: 2px 6px;
-  border-radius: 4px;
-  letter-spacing: 0.02em;
+  font-size: 10px; color: var(--muted); flex-shrink: 0;
 }
 
-/* ── panel body (scrollable) ── */
-.panel-body {
-  padding: 8px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  flex: 1;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(167,139,250,0.25) transparent;
-}
-.panel-body::-webkit-scrollbar { width: 6px; }
-.panel-body::-webkit-scrollbar-thumb { background: rgba(167,139,250,0.25); border-radius: 3px; }
-.panel-body::-webkit-scrollbar-thumb:hover { background: rgba(167,139,250,0.45); }
-.panel-body::-webkit-scrollbar-track { background: transparent; }
+.panel-body { overflow-y: auto; overflow-x: hidden; flex: 1; }
+.panel-body::-webkit-scrollbar { width: 8px; }
+.panel-body::-webkit-scrollbar-track { background: var(--surface-0); }
+.panel-body::-webkit-scrollbar-thumb { background: #24243a; }
+.panel-body::-webkit-scrollbar-thumb:hover { background: #33334e; }
 
-/* ── section divider ── */
+/* ── section header ── */
 .section-divider {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin: 10px 6px 4px;
-  padding: 4px 6px;
-  border-radius: 6px;
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 14px;
+  background: var(--panel-bg);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
   cursor: pointer;
   user-select: none;
-  transition: all var(--t-base);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 0.15em;
+  color: #6a6a84;
+  transition: background var(--t-base), color var(--t-base);
 }
-.section-divider:first-child { margin-top: 4px; }
-.section-divider:hover { background: var(--elem-hover); color: var(--accent-text); }
-.section-divider.open { color: var(--accent-text); }
+.section-divider:hover { background: var(--panel-hi); color: #9a9ab8; }
+.section-divider.open { background: #151522; color: #a0a0bc; }
 .section-divider__chev {
-  width: 10px; height: 10px;
-  display: grid; place-items: center;
-  transition: transform var(--t-base);
+  display: flex; color: var(--muted);
+  transition: transform var(--t-base), color var(--t-base);
   flex-shrink: 0;
 }
-.section-divider.open .section-divider__chev { transform: rotate(90deg); }
+.section-divider.open .section-divider__chev { transform: rotate(90deg); color: var(--accent); }
 .section-divider__count {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
-  color: var(--muted);
-  margin-left: 4px;
+  font-size: 10px; color: var(--disabled); margin-left: auto;
+  letter-spacing: 0; flex-shrink: 0;
 }
-.section-divider__line {
-  flex: 1; height: 1px;
-  background: linear-gradient(90deg, var(--border-soft), transparent);
-}
+.section-divider__line { display: none; }
+
+/* ── section body: the tile grid ──
+   Toggles occupy one column each; everything else spans both. Keeping
+   this a single grid (rather than nesting a wrapper around runs of
+   toggles) means every control stays a direct child of .section-body,
+   which is what the visibility collapse walks. */
 .section-body {
-  overflow: hidden;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  padding: 0 11px;
   max-height: 0;
-  /* JS sets explicit pixel max-height for precise animation timing */
-  transition: max-height 0.30s var(--ease), opacity 0.22s var(--ease);
+  overflow: hidden;
   opacity: 0;
+  transition: max-height 0.26s var(--ease), opacity 0.2s var(--ease),
+              padding 0.26s var(--ease);
   will-change: max-height;
 }
-.section-body.open { opacity: 1; }
+.section-body.open { opacity: 1; padding: 11px; }
 
-/* ── shared row base ── */
-.ctrl-row {
+/* ── tile (toggle) ── */
+.ctrl-row { color: var(--text); user-select: none; }
+
+.toggle {
   position: relative;
-  display: flex; align-items: center;
-  min-height: 30px;
-  padding: 0 12px 0 14px;
-  border-radius: 8px;
+  grid-column: span 1;
+  min-height: 78px;
+  padding: 11px 12px;
+  display: flex; flex-direction: column; justify-content: space-between;
+  background: var(--surface-1);
+  border: 1px solid var(--line);
   cursor: pointer;
-  user-select: none;
-  overflow: hidden;
-  color: var(--text);
-  transition: background var(--t-base);
+  transition: background var(--t-base), border-color var(--t-base);
 }
-.ctrl-row:not(:last-child) { margin-bottom: 2px; }
-.ctrl-row__name {
-  flex: 1;
-  font-size: 12.5px;
-  font-weight: 500;
-  letter-spacing: -0.005em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.toggle:hover { background: var(--elem-hover); border-color: var(--border-strong); }
+.toggle.on { background: var(--accent); border-color: var(--accent); }
+.toggle.on:hover { background: #8b7bf5; border-color: #8b7bf5; }
+
+.toggle .ctrl-row__label { display: block; min-width: 0; }
+.toggle .ctrl-row__name {
+  display: block;
+  font-size: 13px; font-weight: 600; line-height: 1.3;
+  color: #9a9ab4;
+  white-space: normal;
+  transition: color var(--t-base);
 }
-/* hover gradient sweep (animated shine) */
-.ctrl-row::before {
+.toggle.on .ctrl-row__name { color: #fff; }
+.toggle .ctrl-row__desc {
+  font-size: 9.5px; line-height: 1.35;
+  color: var(--disabled);
+  margin-top: 0;
+  transition: color var(--t-base);
+}
+.toggle.on .ctrl-row__desc { color: rgba(255,255,255,0.72); }
+
+/* The pill is gone: the tile itself is the state. What remains is a
+   corner wedge for risk and a mono ON/OFF word, both of which read at a
+   glance from across the room — this panel lives on a second monitor. */
+.toggle__pill {
+  align-self: flex-end;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.1em;
+  color: #3c3c52;
+  transition: color var(--t-base);
+}
+.toggle__pill::after { content: 'OFF'; }
+.toggle.on .toggle__pill { color: rgba(255,255,255,0.9); }
+.toggle.on .toggle__pill::after { content: 'ON'; }
+
+.toggle__stripe { display: none; }
+
+/* risk wedge — costs no line of text */
+.toggle.risk::after {
   content: '';
-  position: absolute; inset: 0;
-  background: linear-gradient(90deg, transparent 0%, rgba(167,139,250,0.08) 50%, transparent 100%);
-  transform: translateX(-110%);
-  transition: transform 0.45s var(--ease);
-  pointer-events: none;
+  position: absolute; top: 0; right: 0;
+  border-left: 18px solid transparent;
+  border-top: 18px solid var(--risk-dim);
+  transition: border-top-color var(--t-base);
 }
-.ctrl-row:hover::before { transform: translateX(110%); }
-.ctrl-row:hover { background: var(--elem-hover); }
-
-/* active toggle row */
-.toggle.on {
-  background: linear-gradient(
-    90deg,
-    rgba(167,139,250,0.16) 0%,
-    rgba(167,139,250,0.04) 60%,
-    transparent 100%
-  );
-}
-.toggle.on:hover { background: linear-gradient(90deg, rgba(167,139,250,0.22), rgba(167,139,250,0.06) 70%, transparent); }
-
-/* left accent stripe (only ON state) */
-.toggle__stripe {
-  position: absolute;
-  left: 0; top: 7px; bottom: 7px;
-  width: 3px;
-  border-radius: 0 2px 2px 0;
-  background: linear-gradient(180deg, var(--accent-text) 0%, var(--accent) 50%, var(--accent-deep) 100%);
-  box-shadow: 0 0 6px var(--accent-glow);
-  opacity: 0;
-  transition: opacity var(--t-base);
-}
-.toggle.on .toggle__stripe {
-  opacity: 1;
-  /* CSS animation lives on `.toggle.on .toggle__stripe` selector.
-     Because we toggle the `.on` class IN PLACE (no DOM rebuild),
-     the animation only restarts on the specific row that flipped,
-     not every row in the panel — which fixes the cascade bug. */
-  animation: stripePulse 1.8s ease-in-out infinite;
-}
-@keyframes stripePulse {
-  0%, 100% { opacity: 1;    box-shadow: 0 0 6px  var(--accent-glow); }
-  50%      { opacity: 0.55; box-shadow: 0 0 12px var(--accent-glow); }
+.toggle.risk.on::after { border-top-color: var(--risk); }
+.toggle.risk .ctrl-row__name { padding-right: 16px; }
+/* The chip is redundant next to the wedge; keep it only for screen readers. */
+.ctrl-row__risk {
+  position: absolute; width: 1px; height: 1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
 }
 
-/* ── section filter (sections past FILTER_THRESHOLD controls) ── */
-.sec-filter {
-  display: flex; align-items: center; gap: 7px;
-  margin: 2px 0 6px;
-  padding: 7px 10px;
+/* ── full-width rows: anything that carries a value ── */
+.dropdown-wrap { grid-column: 1 / -1; }
+.slider .ctrl-row__desc { padding: 2px 12px 0; }
+.dropdown, .keybind {
+  grid-column: 1 / -1;
+  position: relative;
+  display: flex; align-items: center; gap: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
   background: var(--surface-0);
-  border: 1px solid var(--accent-edge);
-  border-radius: 8px;
+  border: 1px solid var(--line-soft);
+  cursor: pointer;
+  transition: background var(--t-base), border-color var(--t-base);
 }
-.sec-filter__icon { display: flex; color: var(--accent-text); flex-shrink: 0; }
+.dropdown:hover, .keybind:hover { background: var(--elem); border-color: var(--line); }
+
+.dropdown .ctrl-row__label,
+.keybind  .ctrl-row__label { flex: 1; min-width: 0; }
+.ctrl-row__name {
+  font-size: 12.5px; font-weight: 600;
+  color: #c6c6da;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ctrl-row__desc {
+  font-size: 9.5px; line-height: 1.35;
+  color: var(--disabled);
+  margin-top: 2px;
+  white-space: normal;
+}
+.ctrl-row.has-desc { min-height: 52px; }
+
+.dropdown__value {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 10px;
+  background: var(--elem-active);
+  border: 1px solid var(--line);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; font-weight: 600;
+  color: var(--accent-text);
+  max-width: 190px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+.dropdown__chev {
+  display: flex; color: var(--muted); flex-shrink: 0;
+  transition: transform var(--t-base);
+}
+.dropdown.open .dropdown__chev { transform: rotate(180deg); color: var(--accent-text); }
+.dropdown__menu {
+  display: none;
+  flex-direction: column;
+  max-height: 240px; overflow-y: auto;
+  background: var(--surface-0);
+  border: 1px solid var(--line);
+  border-top: none;
+}
+.dropdown.open + .dropdown__menu { display: flex; }
+.dropdown__opt {
+  padding: 9px 13px;
+  font-size: 12px;
+  color: var(--subtext);
+  cursor: pointer;
+  border-bottom: 1px solid var(--line-soft);
+  transition: background var(--t-fast), color var(--t-fast);
+}
+.dropdown__opt:last-child { border-bottom: none; }
+.dropdown__opt:hover { background: var(--elem-hover); color: var(--text); }
+.dropdown__opt.selected { background: var(--accent-soft); color: var(--accent-text); font-weight: 600; }
+
+.keybind__chip {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; font-weight: 700;
+  padding: 6px 13px;
+  background: var(--elem-active);
+  border: 1px solid var(--line);
+  color: var(--accent-text);
+  flex-shrink: 0;
+  transition: background var(--t-base), color var(--t-base), border-color var(--t-base);
+}
+.keybind:hover .keybind__chip { border-color: var(--accent-edge); }
+.keybind__chip.listening {
+  background: var(--accent); border-color: var(--accent); color: #fff;
+  animation: keyBlink 1s steps(2, start) infinite;
+}
+@keyframes keyBlink { 50% { opacity: 0.5; } }
+
+/* ── slider: the fill bar IS the block ── */
+.slider {
+  grid-column: 1 / -1;
+  display: block;
+  position: relative;      /* anchors .slider__val */
+  padding: 0;
+  background: var(--surface-0);
+  border: 1px solid var(--line-soft);
+  cursor: default;
+}
+.slider .ctrl-row__name {
+  display: block;
+  padding: 10px 12px 0;
+  font-size: 12.5px; font-weight: 600;
+  color: #c6c6da;
+}
+.slider__track {
+  position: relative;
+  height: 10px;
+  margin: 9px 0 0;
+  background: var(--slider-bg);
+  cursor: pointer;
+}
+.slider__fill {
+  position: absolute; left: 0; top: 0; height: 10px;
+  background: var(--accent);
+  transition: width var(--t-fast);
+}
+.slider__thumb { display: none; }
+.slider__val {
+  position: absolute; top: 10px; right: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; font-weight: 700;
+  color: var(--accent-text);
+}
+
+/* ── section search (large sections only) ── */
+.sec-filter {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 12px;
+  background: var(--surface-0);
+  border: 1px solid var(--line-soft);
+}
+.sec-filter__icon { display: flex; color: var(--muted); flex-shrink: 0; }
 .sec-filter__input {
   flex: 1; min-width: 0;
   background: transparent; border: none; outline: none;
   color: var(--text);
-  font-family: inherit; font-size: 12px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
 }
-.sec-filter__input::placeholder { color: var(--muted); }
+.sec-filter__input::placeholder { color: var(--disabled); }
 .sec-filter__count {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 9.5px; color: var(--muted);
-  flex-shrink: 0;
+  font-size: 9.5px; color: var(--disabled); flex-shrink: 0;
 }
-
-/* ── control description (always visible, not a hover tooltip: this panel
-      lives on a second monitor, where hovering to read is awkward) ── */
-.ctrl-row__desc {
-  font-size: 9.5px;
-  color: var(--muted);
-  line-height: 1.3;
-  margin-top: -1px;
-}
-.ctrl-row__label { flex: 1; min-width: 0; }
-/* The base .ctrl-row__name carries flex:1 so a bare name fills the row. Inside
-   a label that also holds a RISK chip that pushed the chip to the far right,
-   where it collided with the toggle pill — the chip belongs next to the text. */
-.ctrl-row__label .ctrl-row__name { flex: 0 1 auto; }
-.ctrl-row__risk {
-  font-size: 8.5px; font-weight: 700; letter-spacing: 0.08em;
-  color: #fbbf24;
-  border: 1px solid rgba(251,191,36,0.4);
-  padding: 1px 4px; border-radius: 3px;
-  flex-shrink: 0;
-}
-/* Rows carrying a description need room for two lines. */
-.ctrl-row.has-desc { min-height: 40px; height: auto; padding-top: 5px; padding-bottom: 5px; }
 
 /* ── collapsed "not applicable in this mode" summary ── */
 .inactive-note {
-  display: flex; align-items: center; gap: 8px;
-  margin: 8px 4px 2px;
-  padding: 7px 11px;
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 9px;
+  padding: 10px 12px;
   background: var(--surface-0);
-  border: 1px dashed var(--border-soft);
-  border-radius: 8px;
+  border: 1px dashed var(--line);
   cursor: pointer;
   user-select: none;
-  transition: border-color var(--t-base), color var(--t-base);
+  transition: border-color var(--t-base);
 }
 .inactive-note:hover { border-color: var(--accent-edge); }
 .inactive-note__text { font-size: 10.5px; color: var(--disabled); flex: 1; }
-.inactive-note__action { font-size: 9.5px; color: var(--disabled); }
+.inactive-note__action {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px; font-weight: 700; color: var(--accent);
+}
 .inactive-note__chev { display: flex; color: var(--disabled); transition: transform var(--t-base); }
 .inactive-note.open .inactive-note__chev { transform: rotate(180deg); }
-
-/* ── pill switch ── */
-.toggle__pill {
-  position: relative;
-  width: 30px; height: 16px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid var(--border-soft);
-  flex-shrink: 0;
-  transition: background var(--t-base), border-color var(--t-base), box-shadow var(--t-base);
-}
-.toggle__pill::after {
-  content: '';
-  position: absolute;
-  top: 1px; left: 1px;
-  width: 12px; height: 12px;
-  border-radius: 50%;
-  background: #e4e4ef;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.4);
-  transition: transform var(--t-base), background var(--t-base);
-}
-.toggle.on .toggle__pill {
-  background: linear-gradient(135deg, var(--accent-text), var(--accent) 55%, var(--accent-deep));
-  border-color: var(--accent-edge);
-  box-shadow: 0 0 0 1px var(--accent-edge), 0 0 10px var(--accent-glow);
-}
-.toggle.on .toggle__pill::after {
-  background: #fff;
-  transform: translateX(14px);
-  box-shadow: 0 0 4px rgba(255,255,255,0.5), 0 1px 2px rgba(0,0,0,0.4);
-}
-
-/* ── slider row (inline single-row) ── */
-.slider {
-  min-height: 32px;
-  cursor: default;
-  gap: 10px;
-}
-.slider .ctrl-row__name {
-  flex: 0 0 auto;
-  max-width: 90px;
-}
-.slider__track {
-  position: relative;
-  flex: 1;
-  height: 6px;
-  background: var(--slider-bg);
-  border-radius: 3px;
-  cursor: pointer;
-  box-shadow: inset 0 1px 2px rgba(0,0,0,0.5);
-}
-.slider__fill {
-  position: absolute; left: 0; top: 0; bottom: 0;
-  background: linear-gradient(90deg, var(--accent-deep), var(--accent));
-  border-radius: 3px;
-  box-shadow: 0 0 6px var(--accent-glow);
-  pointer-events: none;
-  /* default: smooth WS-echoed updates */
-  transition: width 0.16s var(--ease);
-  will-change: width;
-}
-.slider.dragging .slider__fill { transition: none; }  /* instant during drag */
-.slider__thumb {
-  position: absolute;
-  top: 50%;
-  width: 12px; height: 12px;
-  border-radius: 50%;
-  background: #fff;
-  border: 2px solid var(--accent);
-  transform: translate(-50%, -50%);
-  box-shadow:
-    0 0 0 4px rgba(167, 139, 250, 0.18),
-    0 0 12px var(--accent-glow),
-    0 1px 3px rgba(0,0,0,0.5);
-  pointer-events: none;
-  transition: left 0.16s var(--ease), width var(--t-base), height var(--t-base), box-shadow var(--t-base);
-  will-change: left, width;
-}
-.slider.dragging .slider__thumb { transition: width var(--t-base), height var(--t-base); }
-.slider__val {
-  transition: color var(--t-base), background var(--t-base);
-}
-.slider.dragging .slider__val {
-  color: #fff;
-  background: var(--accent);
-  box-shadow: 0 0 12px var(--accent-glow);
-}
-.slider:hover .slider__thumb,
-.slider.dragging .slider__thumb {
-  width: 14px; height: 14px;
-  box-shadow:
-    0 0 0 5px rgba(167, 139, 250, 0.28),
-    0 0 16px var(--accent-glow),
-    0 1px 3px rgba(0,0,0,0.5);
-}
-.slider__val {
-  flex: 0 0 auto;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10.5px;
-  font-weight: 600;
-  color: var(--accent-text);
-  background: var(--accent-soft);
-  padding: 3px 8px;
-  border-radius: 5px;
-  letter-spacing: 0.02em;
-  min-width: 44px;
-  text-align: center;
-}
-
-/* ── keybind row ── */
-.keybind .ctrl-row__name { flex: 1; }
-.keybind__chip {
-  position: relative;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10.5px;
-  font-weight: 600;
-  color: var(--accent-text);
-  background: var(--slider-bg);
-  padding: 4px 10px;
-  border-radius: 5px;
-  border: 1px solid var(--border-strong);
-  min-width: 48px;
-  text-align: center;
-  letter-spacing: 0.04em;
-  cursor: pointer;
-  user-select: none;
-  box-shadow:
-    inset 0 -2px 0 rgba(0,0,0,0.4),
-    0 1px 0 rgba(255,255,255,0.04);
-  transition: all var(--t-base);
-}
-.keybind:hover .keybind__chip { border-color: var(--accent-edge); color: var(--accent-text); }
-.keybind__chip.listening {
-  background: var(--accent-soft);
-  border-color: var(--accent-edge);
-  animation: keyPulse 0.85s ease-in-out infinite alternate;
-}
-@keyframes keyPulse {
-  from { box-shadow: 0 0 0 0 var(--accent-glow), inset 0 -2px 0 rgba(0,0,0,0.4); }
-  to   { box-shadow: 0 0 0 4px var(--accent-soft), 0 0 16px var(--accent-glow), inset 0 -2px 0 rgba(0,0,0,0.4); }
-}
-
-/* ── dropdown row ── */
-.dropdown { padding-right: 8px; }
-.dropdown__value {
-  font-size: 11px;
-  color: var(--accent-text);
-  margin-right: 6px;
-  max-width: 100px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.dropdown__chev {
-  width: 14px; height: 14px;
-  display: grid; place-items: center;
-  color: var(--muted);
-  transition: transform var(--t-base), color var(--t-base);
-}
-.dropdown.open .dropdown__chev { transform: rotate(180deg); color: var(--accent-text); }
-.dropdown:hover .dropdown__chev { color: var(--accent-text); }
-.dropdown__menu {
-  margin: 2px 0 6px 0;
-  padding: 4px;
-  background: var(--surface-1);
-  border: 1px solid var(--border-soft);
-  border-radius: 8px;
-  display: none;
-  flex-direction: column;
-  gap: 1px;
-  animation: ddIn 0.22s var(--ease);
-}
-@keyframes ddIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
-.dropdown.open + .dropdown__menu { display: flex; }
-.dropdown__opt {
-  padding: 6px 10px;
-  font-size: 11px;
-  color: var(--subtext);
-  border-radius: 5px;
-  cursor: pointer;
-  transition: all var(--t-base);
-  display: flex; align-items: center; gap: 8px;
-}
-.dropdown__opt:hover { background: var(--elem-hover); color: var(--text); }
-.dropdown__opt.selected {
-  background: var(--accent-soft);
-  color: var(--accent-text);
-}
-.dropdown__opt.selected::before {
-  content: '';
-  width: 5px; height: 5px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 6px var(--accent-glow);
-}
-
-/* ── empty state ── */
 .empty-state {
   position: fixed;
   top: 50%; left: 50%;
@@ -1005,18 +845,53 @@ function connect() {
       applyVisibility(msg.value || {});
     } else if (msg.type === 'flag') {
       // The Lua side echoes every flag back, including the one this page just
-      // set. Re-applying an unchanged value re-ran the control's update and
-      // replayed its animation, so a single click looked like two.
+      // set. Two guards, because value-equality alone was not enough: the
+      // panel only ever repaints from an echo whose value MATCHES what the
+      // click asked for, so a stale echo carrying the pre-click value cannot
+      // drag a control back and make one click look like two.
       const prev = flags[msg.flag];
       const same = JSON.stringify(prev) === JSON.stringify(msg.value);
+      const stale = isStaleEcho(msg.flag, msg.value);
+      if (msg.flag === _watchFlag) _dbg(`ECHO ${msg.flag} prev=${JSON.stringify(prev)} new=${JSON.stringify(msg.value)} same=${same} stale=${stale}`);
+      if (stale) return;              // keep flags[] too — it is what we asked for
       flags[msg.flag] = msg.value;
-      if (msg.flag === _watchFlag) _dbg(`ECHO ${msg.flag} prev=${JSON.stringify(prev)} new=${JSON.stringify(msg.value)} same=${same}`);
       if (!same && msg.flag !== draggingFlag) {
         const fn = controlRefs.get(msg.flag);
         if (fn) fn(msg.value, 'echo');
       }
     }
   };
+}
+
+/* ── pending writes ───────────────────────────────────────────────────────
+   flag -> the value this page last asked for, held until the echo confirms
+   it. While a flag is pending, an echo carrying anything else is a message
+   that was already in flight when the click happened; applying it would move
+   the control to the old value and then back, which is exactly the "it flips
+   twice" behaviour. The entry self-clears after PENDING_MS so a dropped echo
+   (Lua reconnecting, say) can never wedge a control permanently. */
+const pending = new Map();
+const PENDING_MS = 2000;
+
+function markPending(flag, value) {
+  const entry = { value, timer: null };
+  const old = pending.get(flag);
+  if (old && old.timer) clearTimeout(old.timer);
+  entry.timer = setTimeout(() => {
+    if (pending.get(flag) === entry) pending.delete(flag);
+  }, PENDING_MS);
+  pending.set(flag, entry);
+}
+
+function isStaleEcho(flag, value) {
+  const entry = pending.get(flag);
+  if (!entry) return false;
+  if (JSON.stringify(entry.value) === JSON.stringify(value)) {
+    clearTimeout(entry.timer);
+    pending.delete(flag);       // confirmed — later echoes are honoured again
+    return true;                // already painted at click time
+  }
+  return true;                  // in-flight leftover: ignore it
 }
 
 function send(payload) {
@@ -1075,6 +950,7 @@ function makeDraggable(panel, header, tab) {
         left: panel.offsetLeft, top: panel.offsetTop,
       }));
     } catch {}
+    packTargets = packTargets.filter((x) => x !== panel);
   };
   header.addEventListener('mousedown', (ev) => {
     if (ev.button !== 0) return;
@@ -1091,7 +967,7 @@ function makeDraggable(panel, header, tab) {
 }
 
 /* Initial layout for 5 panels: pack into rows that fit viewport. */
-function initialLayout(count, panelW = 280, gap = 16) {
+function initialLayout(count, panelW = 440, gap = 16) {
   const colsTry = Math.max(1, Math.floor((window.innerWidth - 2 * gap) / (panelW + gap)));
   const cols = Math.min(count, colsTry);
   const rows = Math.ceil(count / cols);
@@ -1147,12 +1023,12 @@ function buildLabel(ctrl) {
 }
 
 function buildToggle(ctrl) {
-  const row    = el('div', 'ctrl-row toggle' + (ctrl.desc ? ' has-desc' : ''));
-  const stripe = el('div', 'toggle__stripe');
-  const name   = buildLabel(ctrl);
-  const pill   = el('div', 'toggle__pill');
-  row.appendChild(stripe);
-  row.appendChild(name);
+  // A tile, not a row: the whole block is the hit target and the fill is the
+  // state. `risk` puts a wedge in the corner instead of a chip on the name
+  // line, which keeps the name on one line at this tile width.
+  const row  = el('div', 'ctrl-row toggle' + (ctrl.risk ? ' risk' : ''));
+  const pill = el('div', 'toggle__pill');   // renders ON/OFF via ::after
+  row.appendChild(buildLabel(ctrl));
   row.appendChild(pill);
 
   const update = (v, src) => {
@@ -1170,6 +1046,7 @@ function buildToggle(ctrl) {
     if (ctrl.flag === _watchFlag) _dbg(`CLICK ${ctrl.flag} -> ${next}`);
     flags[ctrl.flag] = next;
     update(next, 'click');
+    markPending(ctrl.flag, next);
     send({ type: 'set_flag', flag: ctrl.flag, value: next });
   });
 
@@ -1184,6 +1061,7 @@ function buildSlider(ctrl) {
 
   const row   = el('div', 'ctrl-row slider');
   const name  = el('div', 'ctrl-row__name', ctrl.name);
+  const desc  = ctrl.desc ? el('div', 'ctrl-row__desc', ctrl.desc) : null;
   const track = el('div', 'slider__track');
   const fill  = el('div', 'slider__fill');
   const thumb = el('div', 'slider__thumb');
@@ -1191,6 +1069,7 @@ function buildSlider(ctrl) {
   track.appendChild(fill);
   track.appendChild(thumb);
   row.appendChild(name);
+  if (desc) row.appendChild(desc);
   row.appendChild(track);
   row.appendChild(val);
 
@@ -1251,8 +1130,8 @@ function buildSlider(ctrl) {
 }
 
 function buildKeybind(ctrl) {
-  const row  = el('div', 'ctrl-row keybind');
-  const name = el('div', 'ctrl-row__name', ctrl.name);
+  const row  = el('div', 'ctrl-row keybind' + (ctrl.desc ? ' has-desc' : ''));
+  const name = buildLabel(ctrl);
   const chip = el('div', 'keybind__chip', ctrl.default || 'None');
   row.appendChild(name);
   row.appendChild(chip);
@@ -1292,9 +1171,10 @@ function buildKeybind(ctrl) {
 }
 
 function buildDropdown(ctrl) {
-  const wrap = el('div');
-  const row  = el('div', 'ctrl-row dropdown');
-  const name = el('div', 'ctrl-row__name', ctrl.name);
+  // The wrapper is the grid child, so it (not .dropdown) carries the span.
+  const wrap = el('div', 'dropdown-wrap');
+  const row  = el('div', 'ctrl-row dropdown' + (ctrl.desc ? ' has-desc' : ''));
+  const name = buildLabel(ctrl);
   const val  = el('div', 'dropdown__value', '');
   const chev = el('div', 'dropdown__chev');
   chev.innerHTML = '<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
@@ -1476,6 +1356,7 @@ function buildPanel(tab, controls, index, total) {
     clearTimeout(s._cleanup);
     s._cleanup = setTimeout(() => {
       if (s.divider.classList.contains('open')) s.secBody.style.maxHeight = 'none';
+      schedulePack(60);
     }, 320);
   };
   const closeSection = (s) => {
@@ -1486,6 +1367,7 @@ function buildPanel(tab, controls, index, total) {
       s.secBody.classList.remove('open');
       s.secBody.style.maxHeight = '0px';
       clearTimeout(s._cleanup);
+      schedulePack(340);
     });
   };
 
@@ -1532,6 +1414,36 @@ function buildPanel(tab, controls, index, total) {
   return panel;
 }
 
+/* ── panel packing ───────────────────────────────────────────────────────
+   Panels are absolutely positioned so they can be dragged, which means
+   nothing reflows them when one grows. These pack the ones the user has
+   never dragged (a dragged panel has a saved position and is left alone)
+   into columns by MEASURED height. */
+let packTargets = [];
+let _packTimer = null;
+
+function packPanels() {
+  if (!packTargets.length) return;
+  const gap = 16, top0 = 64;
+  const colW = packTargets[0].offsetWidth + gap;
+  const cols = Math.max(1, Math.floor((window.innerWidth - gap) / colW));
+  const startX = Math.max(gap, (window.innerWidth - (cols * colW - gap)) / 2);
+  const colY = new Array(cols).fill(top0);
+  for (const panel of packTargets) {
+    if (!panel.isConnected) continue;
+    let c = 0;
+    for (let k = 1; k < cols; k++) if (colY[k] < colY[c]) c = k;
+    panel.style.left = Math.round(startX + c * colW) + 'px';
+    panel.style.top  = Math.round(colY[c]) + 'px';
+    colY[c] += panel.offsetHeight + gap;
+  }
+}
+
+function schedulePack(delay) {
+  clearTimeout(_packTimer);
+  _packTimer = setTimeout(packPanels, delay);
+}
+
 function rebuildIfSchemaChanged() {
   const root = document.getElementById('panels-root');
   // Remove empty state but keep statusbar + loader-card
@@ -1564,19 +1476,31 @@ function rebuildIfSchemaChanged() {
   }
 
   const positions = initialLayout(tabs.length);
+  const autoPlaced = [];   // panels using the computed layout, not a saved one
 
   tabs.forEach((t, i) => {
     const panel = buildPanel(t, tabMap.get(t), i, tabs.length);
     // saved position takes priority over initial layout
-    let pos = positions[i];
-    try {
-      const saved = localStorage.getItem(panelPositionKey(t));
-      if (saved) pos = JSON.parse(saved);
-    } catch {}
+    let pos = positions[i], saved = null;
+    try { saved = localStorage.getItem(panelPositionKey(t)); } catch {}
+    if (saved) { try { pos = JSON.parse(saved); } catch { saved = null; } }
     panel.style.left = pos.left + 'px';
     panel.style.top  = pos.top  + 'px';
     root.appendChild(panel);
+    if (!saved) autoPlaced.push(panel);
   });
+
+  // Pack the auto-placed panels by MEASURED height. initialLayout has to guess
+  // a row height before anything is on screen, and its guess (400px) is far
+  // short of an expanded Combat — which is how Misc ended up sitting on top of
+  // it. Measuring after layout costs one frame and cannot guess wrong.
+  // Sections animate open over 260ms, so a single measurement taken right
+  // after build reads collapsed heights and packs them on top of each other.
+  // Pack once the load animation settles, then again after any section opens
+  // or closes — that is when a panel's height actually changes.
+  packTargets = autoPlaced;
+  setTimeout(packPanels, 420);    // after the load-time section open settles
+  setTimeout(packPanels, 1100);   // and once more, in case that frame was busy
 
   // A rebuild throws away every row, so the collapse summaries go with them.
   // Re-derive them from the last map the script sent instead of waiting for the
@@ -1827,17 +1751,7 @@ connect();
 /* Re-layout panels that never had saved positions when the viewport size changes
    (the user's first interaction usually anchors them; this only repositions
    panels that haven't moved). */
-window.addEventListener('resize', () => {
-  const root = document.getElementById('panels-root');
-  const panels = root.querySelectorAll('.panel');
-  const positions = initialLayout(panels.length);
-  panels.forEach((p, i) => {
-    if (!localStorage.getItem(panelPositionKey(p.dataset.tab))) {
-      p.style.left = positions[i].left + 'px';
-      p.style.top  = positions[i].top  + 'px';
-    }
-  });
-});
+window.addEventListener('resize', () => schedulePack(120));
 </script>
 </body>
 </html>
