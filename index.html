@@ -329,10 +329,15 @@ body {
   transition: transform var(--t-base);
 }
 .dropdown.open .dropdown__chev { transform: rotate(180deg); color: var(--accent-text); }
+.dropdown__menu::-webkit-scrollbar { width: 8px; }
+.dropdown__menu::-webkit-scrollbar-track { background: var(--surface-0); }
+.dropdown__menu::-webkit-scrollbar-thumb { background: #24243a; }
+.dropdown__menu::-webkit-scrollbar-thumb:hover { background: #33334e; }
+.dropdown__menu { scrollbar-width: thin; scrollbar-color: #24243a var(--surface-0); }
 .dropdown__menu {
   display: none;
   flex-direction: column;
-  max-height: 240px; overflow-y: auto;
+  max-height: 340px; overflow-y: auto;
   background: var(--surface-0);
   border: 1px solid var(--line);
   border-top: none;
@@ -1404,7 +1409,6 @@ function buildPanel(tab, controls, index, total) {
     clearTimeout(s._cleanup);
     s._cleanup = setTimeout(() => {
       if (s.divider.classList.contains('open')) s.secBody.style.maxHeight = 'none';
-      schedulePack(60);
     }, 320);
   };
   const closeSection = (s) => {
@@ -1415,7 +1419,6 @@ function buildPanel(tab, controls, index, total) {
       s.secBody.classList.remove('open');
       s.secBody.style.maxHeight = '0px';
       clearTimeout(s._cleanup);
-      schedulePack(340);
     });
   };
 
