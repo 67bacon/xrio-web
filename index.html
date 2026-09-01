@@ -105,6 +105,19 @@ body {
   background: var(--accent);
 }
 .dot.pulse { animation: dotPulse 1.6s ease-in-out infinite; }
+.statusbar__tidy {
+  font-family: 'Geist', system-ui, sans-serif;
+  font-size: 10px; font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  background: var(--elem);
+  border: 1px solid var(--line);
+  padding: 4px 10px;
+  margin-left: 3px;
+  cursor: pointer;
+  transition: color var(--t-base), border-color var(--t-base), background var(--t-base);
+}
+.statusbar__tidy:hover { color: var(--accent-text); border-color: var(--accent-edge); background: var(--elem-hover); }
 @keyframes dotPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
 
 /* ── panel ── */
@@ -920,7 +933,12 @@ function el(tag, cls, txt) {
 /* ==========================================================================
    PANEL DRAG — header drag, position persists in localStorage
    ========================================================================== */
-function panelPositionKey(tab) { return 'xrio.panelpos.' + tab; }
+/* Saved positions are only meaningful for the layout that produced them: the
+   block redesign went from 280px panels to 440px, so every stored coordinate
+   from before it packs panels on top of one another. Bumping this retires the
+   old set rather than honouring coordinates that no longer fit. */
+const LAYOUT_VERSION = 2;
+function panelPositionKey(tab) { return 'xrio.panelpos.v' + LAYOUT_VERSION + '.' + tab; }
 
 function makeDraggable(panel, header, tab) {
   let dx = 0, dy = 0, sx = 0, sy = 0, dragging = false;
@@ -1444,6 +1462,37 @@ function schedulePack(delay) {
   _packTimer = setTimeout(packPanels, delay);
 }
 
+/* Saved positions come from whatever window size and section state the user
+   last had. Re-injecting with a different one — a resized window, a schema
+   that grew a panel, sections left open — puts panels on top of each other or
+   off the edge, which is what "every injection scrambles the UI" was. Rather
+   than trust them blindly, check the result and rebuild the layout when it is
+   visibly wrong. */
+function layoutIsBroken() {
+  const ps = [...document.querySelectorAll('.panel')];
+  if (ps.length < 2) return false;
+  const r = ps.map((e) => e.getBoundingClientRect());
+  for (let i = 0; i < r.length; i++) {
+    if (r[i].right < 40 || r[i].left > window.innerWidth - 40 ||
+        r[i].bottom < 30 || r[i].top > window.innerHeight - 30 || r[i].top < 0) return true;
+    for (let j = i + 1; j < r.length; j++) {
+      if (r[i].left < r[j].right && r[j].left < r[i].right &&
+          r[i].top < r[j].bottom && r[j].top < r[i].bottom) return true;
+    }
+  }
+  return false;
+}
+
+/* Lay every panel out again and forget the stored coordinates, so the tidy
+   survives the next injection instead of being undone by them. */
+function tidyPanels() {
+  packTargets = [...document.querySelectorAll('.panel')];
+  packPanels();
+  for (const panel of packTargets) {
+    try { localStorage.removeItem(panelPositionKey(panel.dataset.tab)); } catch {}
+  }
+}
+
 function rebuildIfSchemaChanged() {
   const root = document.getElementById('panels-root');
   // Remove empty state but keep statusbar + loader-card
@@ -1500,7 +1549,10 @@ function rebuildIfSchemaChanged() {
   // or closes — that is when a panel's height actually changes.
   packTargets = autoPlaced;
   setTimeout(packPanels, 420);    // after the load-time section open settles
-  setTimeout(packPanels, 1100);   // and once more, in case that frame was busy
+  setTimeout(() => {
+    packPanels();                 // once more, in case that frame was busy
+    if (layoutIsBroken()) tidyPanels();
+  }, 1100);
 
   // A rebuild throws away every row, so the collapse summaries go with them.
   // Re-derive them from the last map the script sent instead of waiting for the
@@ -1600,6 +1652,15 @@ function renderStatusbar() {
   const brand = el('span', 'brand');
   brand.innerHTML = 'XRIO <span class="accent">v1</span>';
   bar.appendChild(dot); bar.appendChild(txt); bar.appendChild(brand);
+
+  // Manual escape hatch. The automatic repair only fires when the layout is
+  // measurably broken (overlapping or off-screen); a layout that is merely
+  // untidy is a judgement call, so leave that button in reach.
+  const tidy = el('button', 'statusbar__tidy', '\u6574\u7406');
+  tidy.title = '\u91cd\u65b0\u6392\u5217\u6240\u6709\u9762\u677f';
+  tidy.addEventListener('click', tidyPanels);
+  bar.appendChild(tidy);
+
   document.body.appendChild(bar);
 }
 
