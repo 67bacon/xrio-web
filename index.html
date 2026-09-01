@@ -1000,6 +1000,18 @@ function el(tag, cls, txt) {
    old set rather than honouring coordinates that no longer fit. */
 const LAYOUT_VERSION = 2;
 function panelPositionKey(tab) { return 'xrio.panelpos.v' + LAYOUT_VERSION + '.' + tab; }
+/* Which sections were left open. Re-injecting reset every panel to "first
+   section expanded", so a section closed to get it out of the way came back
+   every time. */
+function sectionStateKey(tab, name) {
+  return 'xrio.section.v' + LAYOUT_VERSION + '.' + tab + '.' + name;
+}
+function rememberSection(tab, name, open) {
+  try { localStorage.setItem(sectionStateKey(tab, name), open ? '1' : '0'); } catch {}
+}
+function recallSection(tab, name) {
+  try { return localStorage.getItem(sectionStateKey(tab, name)); } catch { return null; }
+}
 
 function makeDraggable(panel, header, tab) {
   let dx = 0, dy = 0, sx = 0, sy = 0, dragging = false;
@@ -1489,7 +1501,8 @@ function buildPanel(tab, controls, index, total) {
   });
 
   // Animated open/close using measured scrollHeight (smooth precise timing)
-  const openSection = (s) => {
+  const openSection = (s, remember) => {
+    if (remember !== false) rememberSection(tab, s.name, true);
     s.divider.classList.add('open');
     s.secBody.classList.add('open');
     // Measure with the constraint lifted. Reading scrollHeight straight after
@@ -1507,7 +1520,8 @@ function buildPanel(tab, controls, index, total) {
       if (s.divider.classList.contains('open')) s.secBody.style.maxHeight = 'none';
     }, 320);
   };
-  const closeSection = (s) => {
+  const closeSection = (s, remember) => {
+    if (remember !== false) rememberSection(tab, s.name, false);
     // Lock current pixel height so transition has a from-value, then collapse next frame
     s.secBody.style.maxHeight = s.secBody.scrollHeight + 'px';
     requestAnimationFrame(() => {
@@ -1518,10 +1532,19 @@ function buildPanel(tab, controls, index, total) {
     });
   };
 
-  // Initial: open first section
+  // Restore what was open last time; fall back to opening the first section
+  // when this panel has never been touched.
   if (sectionRefs.length > 0) {
-    // Defer one frame so scrollHeight is correct after DOM insert
-    requestAnimationFrame(() => openSection(sectionRefs[0]));
+    const saved = sectionRefs.map((s) => recallSection(tab, s.name));
+    requestAnimationFrame(() => {
+      if (saved.every((v) => v === null)) {
+        openSection(sectionRefs[0], false);
+      } else {
+        sectionRefs.forEach((s, i) => {
+          if (saved[i] === '1') openSection(s, false);
+        });
+      }
+    });
   }
 
   // Click to expand/collapse + auto-close siblings if total would overflow viewport
