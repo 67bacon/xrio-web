@@ -855,7 +855,9 @@ function connect() {
       // used to sit there looking usable (Wallbang (RCL) is Right Click Lock
       // only, Auto Shoot is Silent Aim only), which is the main reason the
       // panel read as cluttered.
+      _dbg('VIS recv ' + JSON.stringify(msg.value));
       applyVisibility(msg.value || {});
+      _dbg('VIS applied');
     } else if (msg.type === 'flag') {
       // The Lua side echoes every flag back, including the one this page just
       // set. Two guards, because value-equality alone was not enough: the
@@ -1064,6 +1066,7 @@ function buildToggle(ctrl) {
     if (ctrl.flag === _watchFlag) _dbg(`CLICK ${ctrl.flag} -> ${next}`);
     flags[ctrl.flag] = next;
     update(next, 'click');
+    applyShowWhen();
     markPending(ctrl.flag, next);
     send({ type: 'set_flag', flag: ctrl.flag, value: next });
   });
@@ -1239,6 +1242,7 @@ function buildDropdown(ctrl) {
       const v = e.dataset.value;
       flags[ctrl.flag] = v;
       update(v);
+      applyShowWhen();          // before the round trip, not after it
       send({ type: 'set_flag', flag: ctrl.flag, value: v });
       row.classList.remove('open');
       menu.style.display = 'none';
@@ -1557,6 +1561,7 @@ function rebuildIfSchemaChanged() {
   // A rebuild throws away every row, so the collapse summaries go with them.
   // Re-derive them from the last map the script sent instead of waiting for the
   // next Aim Mode change, which may never come.
+  applyShowWhen();
   if (Object.keys(lastVisibility).length) applyVisibility(lastVisibility);
 }
 
@@ -1574,13 +1579,41 @@ function adoptVisibility() {
     lastVisibility = flags._visibility;
 }
 
+/* Controls whose relevance depends on another control's VALUE declare it in
+   the schema (`showWhen`). Resolving those here, from `flags`, means the panel
+   reacts to its own click immediately — the script's _visibility map still
+   governs Aim Mode, but a dependency the panel can work out for itself should
+   never wait for a round trip. */
+function showWhenSatisfied(ctrl) {
+  const w = ctrl && ctrl.showWhen;
+  if (!w || !w.flag) return true;
+  let v = flags[w.flag];
+  if (Array.isArray(v)) v = v[0];          // dropdowns arrive as a one-item list
+  return String(v) === String(w.equals);
+}
+
+/* Apply every showWhen rule against the current flags. Cheap enough to run on
+   any change: it touches only the controls that declared a rule. */
+function applyShowWhen() {
+  for (const c of schema) {
+    if (!c.showWhen) continue;
+    const row = rowRefs.get(c.flag);
+    if (!row) continue;
+    const ok = showWhenSatisfied(c);
+    if (row.hidden === !ok) continue;
+    row.hidden = !ok;
+  }
+}
+
 function applyVisibility(map) {
   lastVisibility = map || {};
+  const _visT0 = performance.now();
 
   // Options that do not apply in the current Aim Mode are collapsed behind one
   // summary line per section, not hidden outright: hiding them leaves no way to
   // discover what the other mode offers, and dimming them in place costs the
   // vertical room this panel does not have.
+  applyShowWhen();
   const inactiveBySection = new Map();
   for (const [flag, shown] of Object.entries(lastVisibility)) {
     const row = rowRefs.get(flag);
@@ -1631,6 +1664,7 @@ function applyVisibility(map) {
     const count = divider && divider.querySelector('.section-divider__count');
     if (count) count.textContent = String(visible);
   });
+  _dbg('applyVisibility took ' + (performance.now() - _visT0).toFixed(1) + 'ms');
 }
 
 function applyAllFlags() {

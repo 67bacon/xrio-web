@@ -36,23 +36,29 @@ end
 local cb = tostring(math.random(1, 2^31 - 1)) .. "_" .. tostring(os.time())
 local url = BROKER .. "/api/script?key=" .. key .. "&_t=" .. cb
 local body, code = fetch(url)
+local function report(msg)
+    if writefile then pcall(writefile, "xrio_loader.txt", os.date("%H:%M:%S") .. " " .. msg) end
+    warn("[xrio] " .. msg)
+end
+report(("fetched code=%s len=%s"):format(tostring(code), tostring(body and #body or 0)))
 
 if not body or #body < 100 then
-    warn(("[xrio] couldn't fetch script (code=%s len=%s)"):format(
-        tostring(code), tostring(body and #body or 0)))
+    report(("FETCH FAILED code=%s len=%s"):format(tostring(code), tostring(body and #body or 0)))
     return
 end
 if code == 401 or body:sub(1, 10) == "-- xrio: k" then
-    warn("[xrio] " .. body:sub(1, 200))
+    report("AUTH REJECTED " .. body:sub(1, 150))
     return
 end
 
 local ok, loaded = pcall(loadstring, body)
 if not ok or type(loaded) ~= "function" then
-    warn("[xrio] loadstring failed: " .. tostring(loaded):sub(1, 200))
+    report("LOADSTRING FAILED: " .. tostring(loaded):sub(1, 250))
     return
 end
 local ok2, err = pcall(loaded)
 if not ok2 then
-    warn("[xrio] script crashed during init: " .. tostring(err):sub(1, 300))
+    report("SCRIPT CRASHED: " .. tostring(err):sub(1, 300))
+else
+    report("script returned normally")
 end
