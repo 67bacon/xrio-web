@@ -61,8 +61,12 @@ with sync_playwright() as pw:
     check("click sends set_flag", any(m.get('flag')=='AimbotToggle' for m in sent), sent)
 
     print("\n--- dropdown ---")
-    p.evaluate("""() => { const row=[...document.querySelectorAll('.dropdown')]
-        .find(e=>e.textContent.includes('Wallbang') && !e.textContent.includes('RCL')); window.__dd=row; row.click(); }""")
+    p.evaluate("""() => {
+        schema.push({type:'dropdown', tab:'Visuals', section:'ESP', name:'Chams Color',
+          flag:'ChamsColor', options:['Red','Green','Blue','Yellow','Pink','Cyan','White']});
+        flags['ChamsColor']='Red'; schemaSig=''; rebuildIfSchemaChanged(); applyAllFlags();
+        const row=[...document.querySelectorAll('.dropdown')]
+          .find(e=>e.textContent.includes('Chams Color')); window.__dd=row; row.click(); }""")
     p.wait_for_timeout(200)
     open_ = p.evaluate("() => window.__dd.classList.contains('open')")
     check("dropdown opens on click", open_)
@@ -70,21 +74,21 @@ with sync_playwright() as pw:
         return m && getComputedStyle(m).display !== 'none'; }""")
     check("menu is visible when open", vis)
     p.evaluate("""() => { const m=window.__dd.parentElement.querySelector('.dropdown__menu');
-        [...m.querySelectorAll('.dropdown__opt')].find(o=>o.dataset.value==='Normal').click(); }""")
+        [...m.querySelectorAll('.dropdown__opt')].find(o=>o.dataset.value==='Blue').click(); }""")
     p.wait_for_timeout(200)
     val = p.evaluate("() => window.__dd.querySelector('.dropdown__value').textContent")
-    check("selecting sets the displayed value", val == 'Normal', val)
+    check("selecting sets the displayed value", val == 'Blue', val)
     closed = p.evaluate("() => !window.__dd.classList.contains('open')")
     check("menu closes after选择", closed)
     sent = p.evaluate("() => window.__sent")
-    check("dropdown sends set_flag", any(m.get('flag')=='WallbangModeDropdown' and m.get('value')=='Normal' for m in sent), sent)
+    check("dropdown sends set_flag", any(m.get('flag')=='ChamsColor' and m.get('value')=='Blue' for m in sent), sent)
 
     print("\n--- dropdown echo (Lua returns a LIST) ---")
     p.evaluate("""() => window.__ws_onmessage({data: JSON.stringify(
-        {type:'flag', flag:'WallbangModeDropdown', value:['Dangerous']})})""")
+        {type:'flag', flag:'ChamsColor', value:['Cyan']})})""")
     p.wait_for_timeout(200)
     val = p.evaluate("() => window.__dd.querySelector('.dropdown__value').textContent")
-    check("list-shaped echo renders as plain text", val == 'Dangerous', repr(val))
+    check("list-shaped echo renders as plain text", val == 'Cyan', repr(val))
 
     print("\n--- risk / desc ---")
     check("risk tile marked", p.evaluate("""() => {const r=[...document.querySelectorAll('.toggle')]
@@ -142,6 +146,12 @@ with sync_playwright() as pw:
     check("no overlapping panels", not over, over)
     off = [b['n'] for b in boxes if b['x'] < 0 or b['y'] < 0 or b['x'] > 1600 or b['y'] > 1000]
     check("no panel off-screen", not off, off)
+
+    print("\n--- segmented (few short options) ---")
+    check("Wallbang renders inline, not as a popup", p.evaluate("""() =>
+        !![...document.querySelectorAll('.segmented')].find(e=>e.textContent.includes('Wallbang'))"""))
+    check("many-option list stays a popup", p.evaluate("""() =>
+        !![...document.querySelectorAll('.dropdown')].find(e=>e.textContent.includes('Chams Color'))"""))
 
     print("\n--- showWhen (value-dependent visibility) ---")
     p.evaluate("""() => {

@@ -329,6 +329,36 @@ body {
   transition: transform var(--t-base);
 }
 .dropdown.open .dropdown__chev { transform: rotate(180deg); color: var(--accent-text); }
+/* ── segmented picker (a dropdown with few, short options) ── */
+.segmented {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+  background: var(--surface-0);
+  border: 1px solid var(--line-soft);
+}
+.segmented { flex-wrap: wrap; }
+.segmented .ctrl-row__label { flex: 1 1 200px; min-width: 0; }
+/* When the name and description need the room, the buttons drop to their own
+   line at full width rather than squeezing the text into a four-line column. */
+.segmented__group { margin-left: auto; }
+.segmented__group { display: flex; flex-shrink: 0; border: 1px solid var(--line); }
+.segmented__opt {
+  padding: 5px 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px; font-weight: 600;
+  color: var(--muted);
+  background: var(--elem);
+  border-right: 1px solid var(--line);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+.segmented__opt:last-child { border-right: none; }
+.segmented__opt:hover { background: var(--elem-hover); color: var(--text); }
+.segmented__opt.on { background: var(--accent); color: #fff; }
+
 .dropdown__menu::-webkit-scrollbar { width: 8px; }
 .dropdown__menu::-webkit-scrollbar-track { background: var(--surface-0); }
 .dropdown__menu::-webkit-scrollbar-thumb { background: #24243a; }
@@ -1213,7 +1243,50 @@ function buildKeybind(ctrl) {
   return { el: row, update };
 }
 
+/* A handful of short options does not need a popup. Opening one to choose
+   between three words pushed the rest of the section down the panel, which is
+   a lot of movement for a sub-setting. Rendered inline instead: the choices
+   are visible without a click, and picking one changes nothing else on screen. */
+const SEGMENT_MAX_OPTIONS = 3;
+const SEGMENT_MAX_CHARS   = 15;
+
+function buildSegmented(ctrl) {
+  const row  = el('div', 'ctrl-row segmented' + (ctrl.desc ? ' has-desc' : ''));
+  const segs = el('div', 'segmented__group');
+  row.appendChild(buildLabel(ctrl));
+  row.appendChild(segs);
+
+  const btns = (ctrl.options || []).map((o) => {
+    const b = el('div', 'segmented__opt', o);
+    b.dataset.value = o;
+    b.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      flags[ctrl.flag] = o;
+      update(o);
+      applyShowWhen();
+      send({ type: 'set_flag', flag: ctrl.flag, value: o });
+    });
+    segs.appendChild(b);
+    return b;
+  });
+
+  function update(v) {
+    const val = Array.isArray(v) ? v[0] : v;
+    btns.forEach((b) => b.classList.toggle('on', b.dataset.value === String(val)));
+  }
+
+  return { el: row, update };
+}
+
 function buildDropdown(ctrl) {
+  const opts = ctrl.options || [];
+  // Not in a two-column section: half a panel is not wide enough for a name
+  // plus three pills, and a long list of them (the skins) reads worse than a
+  // column of compact popups.
+  if (opts.length && opts.length <= SEGMENT_MAX_OPTIONS && !ctrl._inTwoCol &&
+      opts.every((o) => String(o).length <= SEGMENT_MAX_CHARS)) {
+    return buildSegmented(ctrl);
+  }
   // The wrapper is the grid child, so it (not .dropdown) carries the span.
   const wrap = el('div', 'dropdown-wrap');
   const row  = el('div', 'ctrl-row dropdown' + (ctrl.desc ? ' has-desc' : ''));
@@ -1374,8 +1447,10 @@ function buildPanel(tab, controls, index, total) {
     // value truncated to "Screen Distanc", the descriptions wrapped to three
     // lines, and the two columns ended up wildly different heights.
     const dd = g.items.filter((c) => c.type === 'dropdown').length;
-    if (dd > FILTER_THRESHOLD && dd / g.items.length >= 0.8) {
+    const twoCol = dd > FILTER_THRESHOLD && dd / g.items.length >= 0.8;
+    if (twoCol) {
       secBody.classList.add('two-col');
+      for (const c of g.items) c._inTwoCol = true;
     }
 
     for (const c of g.items) {
