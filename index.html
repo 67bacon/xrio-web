@@ -79,6 +79,32 @@ body {
   font-size: 13px;
   min-height: 100vh;
   overflow: hidden;
+  /* This is an app, not a document. Dragging across a panel used to leave the
+     browser's default blue selection highlight over status text and labels —
+     text nobody would ever want to copy. Selection is switched off wholesale
+     and switched back on below for the few things that ARE content. */
+  user-select: none;
+  -webkit-user-select: none;
+  /* And no native drag either. With selection off, holding the left button and
+     moving no longer starts a selection, so the browser fell back to dragging
+     the element instead — which paints a translucent ghost of half the panel
+     across the page. Nothing here uses HTML5 drag and drop (panels and sliders
+     are all mousedown-driven), so there is nothing to lose by killing it. */
+  -webkit-user-drag: none;
+}
+
+/* The exceptions: things people genuinely copy or type into. */
+.loader-card__code,
+input, textarea, .gate__input {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* And when selection does happen, it should belong to this palette rather than
+   the operating system's. */
+::selection {
+  background: var(--accent);
+  color: #fff;
 }
 
 /* ── status bar ── */
@@ -88,7 +114,8 @@ body {
   padding: 8px 13px;
   background: var(--panel-bg);
   border: 1px solid var(--line);
-  z-index: 60;
+  /* Above the panels: it is a fixed toolbar and must stay reachable. */
+  z-index: 80;
   user-select: none;
 }
 .brand {
@@ -123,6 +150,9 @@ body {
 /* ── panel ── */
 .panel {
   position: absolute;
+  /* Explicit, so panels beat the inject card. Both are positioned, so DOM
+     order alone would have put whichever was appended last on top. */
+  z-index: 70;
   width: 440px;
   max-height: calc(100vh - 40px);
   display: flex; flex-direction: column;
@@ -217,6 +247,27 @@ body {
   will-change: max-height;
 }
 .section-body.open { opacity: 1; padding: 11px; }
+/* ── section intro ──────────────────────────────────────────────────────────
+   How to USE a group of controls, which no per-control description can carry:
+   the sequence, the prerequisite, the tradeoff. Spans both columns and is
+   deliberately not a card — a border and fill here would read as one more
+   thing to operate. */
+/* The section intro is guidance, read once. Left inline it was the largest
+   block of text on the panel and it pushed the controls it explains below the
+   fold. It hangs off the section header now, on the same hover as everything
+   else. */
+.section-note { display: none; }
+.section-note--inline {
+  grid-column: 1 / -1;
+  display: flex; flex-direction: column; gap: 5px;
+  padding: 9px 11px 11px;
+  border-left: 2px solid var(--accent);
+  background: var(--surface-0);
+  font-size: 11.5px; line-height: 1.55;
+  color: var(--muted);
+}
+.section-note strong { color: var(--text); font-weight: 600; }
+.section-note .section-note__warn { color: var(--accent-text); }
 
 /* ── tile (toggle) ── */
 .ctrl-row { color: var(--text); user-select: none; }
@@ -245,13 +296,13 @@ body {
   transition: color var(--t-base);
 }
 .toggle.on .ctrl-row__name { color: #fff; }
-.toggle .ctrl-row__desc {
+.toggle .ctrl-row__desc--unused {
   font-size: 9.5px; line-height: 1.35;
   color: var(--disabled);
   margin-top: 0;
   transition: color var(--t-base);
 }
-.toggle.on .ctrl-row__desc { color: rgba(255,255,255,0.72); }
+
 
 /* The pill is gone: the tile itself is the state. What remains is a
    corner wedge for risk and a mono ON/OFF word, both of which read at a
@@ -287,7 +338,7 @@ body {
 
 /* ── full-width rows: anything that carries a value ── */
 .dropdown-wrap { grid-column: 1 / -1; }
-.slider .ctrl-row__desc { padding: 2px 12px 0; }
+
 .dropdown, .keybind {
   grid-column: 1 / -1;
   position: relative;
@@ -308,13 +359,27 @@ body {
   color: #c6c6da;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.ctrl-row__desc {
-  font-size: 9.5px; line-height: 1.35;
-  color: var(--disabled);
-  margin-top: 2px;
-  white-space: normal;
+/* Descriptions are no longer part of the layout. Every control carrying two or
+   three lines of explanation turned the panel into a wall of prose in which the
+   controls themselves were the hardest thing to find — and the text is read
+   once, while the control is used constantly. They move to hover, the way every
+   dense tool UI does it, and the row keeps only its name and its value. */
+.ctrl-row__desc { display: none; }
+.ctrl-row.has-desc { min-height: 0; }
+#tip {
+  position: fixed; z-index: 200;
+  max-width: 300px;
+  padding: 8px 10px;
+  background: var(--surface-0);
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--accent);
+  color: var(--text);
+  font-size: 11px; line-height: 1.5;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--t-fast);
 }
-.ctrl-row.has-desc { min-height: 52px; }
+#tip.show { opacity: 1; }
 
 .dropdown__value {
   display: flex; align-items: center; gap: 8px;
@@ -648,75 +713,91 @@ body {
 }
 
 /* ── loader command card (shown after auth, bottom-right) ── */
+/* ── inject card ────────────────────────────────────────────────────────────
+   Rebuilt to speak the panel's language. It used to be a rounded, blurred
+   floating card with a horizontally SCROLLING code box — three things the
+   panels never do. The scrollbar was the worst of it: that string is never read,
+   only copied, so the room it demanded bought nothing and the bar itself was the
+   only rounded, non-square element on screen. Now: square edges, the same
+   surface and line tokens as a panel, one ellipsised line and a real Copy
+   button. */
 .loader-card {
   position: fixed;
   right: 16px; bottom: 16px;
-  z-index: 90;
-  width: 380px;
+  /* Below the panels. This is a one-time-use affordance and the panels are the
+     product; at 90 with the panels unset it painted over live controls. */
+  z-index: 40;
+  width: 340px;
   max-width: calc(100vw - 32px);
-  padding: 12px 14px;
   background: var(--panel-bg);
-  backdrop-filter: blur(18px) saturate(150%);
-  border: 1px solid var(--border-soft);
-  border-radius: 12px;
-  box-shadow: var(--shadow-panel);
+  border: 1px solid var(--line);
   font-size: 11px;
   transition: opacity var(--t-base), transform var(--t-base);
 }
 .loader-card.collapsed { transform: translateY(calc(100% + 16px)); opacity: 0; pointer-events: none; }
 .loader-card__head {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 8px;
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
   color: var(--muted);
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
+  font-family: 'JetBrains Mono', monospace;
   font-weight: 700;
   font-size: 10px;
 }
+.loader-card__dot { width: 6px; height: 6px; background: var(--accent); flex-shrink: 0; }
+.loader-card__head span { flex: 1; }
 .loader-card__close {
   background: none; border: 0;
   color: var(--muted);
   cursor: pointer;
-  font-size: 13px;
-  padding: 0 4px;
-  transition: color var(--t-base);
+  font-size: 13px; line-height: 1;
+  padding: 0 2px;
+  transition: color var(--t-fast);
 }
 .loader-card__close:hover { color: var(--text); }
+/* One row: the command, then the only thing anyone does with it. */
+.loader-card__row { display: flex; align-items: stretch; border-bottom: 1px solid var(--line); }
 .loader-card__code {
-  display: block;
-  padding: 8px 10px;
-  background: var(--slider-bg);
-  border: 1px solid var(--border-hair);
-  border-radius: 7px;
+  flex: 1; min-width: 0;
+  padding: 9px 11px;
+  background: var(--surface-0);
   font-family: 'JetBrains Mono', monospace;
   font-size: 10.5px;
-  color: var(--accent-text);
-  overflow-x: auto;
+  line-height: 1.5;
+  color: var(--muted);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer;
-  transition: background var(--t-base);
+  transition: color var(--t-fast), background var(--t-fast);
 }
-.loader-card__code:hover { background: var(--elem); }
-.loader-card__hint {
-  margin-top: 6px;
-  color: var(--muted);
-  font-size: 10px;
-  text-align: center;
-  letter-spacing: 0.04em;
-}
-.loader-card__hint.copied { color: var(--accent-text); }
-.loader-card__signout {
-  margin-top: 6px;
-  text-align: center;
-}
-.loader-card__signout a {
-  color: var(--muted);
-  font-size: 10px;
-  text-decoration: none;
+.loader-card__row:hover .loader-card__code { color: var(--text); background: var(--elem); }
+.loader-card__copy {
+  flex-shrink: 0;
+  padding: 0 14px;
+  display: flex; align-items: center;
+  border: 0; border-left: 1px solid var(--line);
+  background: var(--elem);
+  color: var(--accent-text);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 0.1em;
   cursor: pointer;
-  border-bottom: 1px dashed var(--border-soft);
+  transition: background var(--t-fast), color var(--t-fast);
 }
-.loader-card__signout a:hover { color: var(--accent-text); }
+.loader-card__copy:hover { background: var(--accent); color: #fff; }
+.loader-card__copy.done { background: var(--accent); color: #fff; }
+.loader-card__foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 7px 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--disabled);
+}
+.loader-card__foot a { color: var(--muted); text-decoration: none; cursor: pointer; }
+.loader-card__foot a:hover { color: var(--accent-text); }
 </style>
 </head>
 <body>
@@ -729,7 +810,7 @@ body {
    STATE — minimal, all WebSocket logic preserved from original.
    ========================================================================== */
 // Broker URL: tunnel for hosted, direct ws:// for localhost
-const TUNNEL_DEFAULT = 'grand-invitations-boat-formed.trycloudflare.com';
+const TUNNEL_DEFAULT = 'thank-handle-julie-demonstrates.trycloudflare.com';
 const WS_URL = (() => {
   const qp = new URLSearchParams(location.search).get('broker');
   if (qp) return (qp.startsWith('ws') ? qp : 'wss://' + qp + '/');
@@ -915,7 +996,7 @@ function connect() {
       // drag a control back and make one click look like two.
       const prev = flags[msg.flag];
       const same = JSON.stringify(prev) === JSON.stringify(msg.value);
-      const stale = isStaleEcho(msg.flag, msg.value);
+      const stale = isStaleEcho(msg.flag);
       if (msg.flag === _watchFlag) _dbg(`ECHO ${msg.flag} prev=${JSON.stringify(prev)} new=${JSON.stringify(msg.value)} same=${same} stale=${stale}`);
       if (stale) return;              // keep flags[] too — it is what we asked for
       flags[msg.flag] = msg.value;
@@ -951,21 +1032,19 @@ function markPending(flag, value) {
   pending.set(flag, entry);
 }
 
-/* A dropdown value goes out as a string and comes back as a one-item list. */
-function sameValue(a, b) {
-  const norm = (v) => (Array.isArray(v) && v.length === 1) ? v[0] : v;
-  return JSON.stringify(norm(a)) === JSON.stringify(norm(b));
-}
-
-function isStaleEcho(flag, value) {
+function isStaleEcho(flag) {
   const entry = pending.get(flag);
   if (!entry) return false;
-  if (sameValue(entry.value, value)) {
-    clearTimeout(entry.timer);
-    pending.delete(flag);       // confirmed — later echoes are honoured again
-    return true;                // already painted at click time
-  }
-  return true;                  // in-flight leftover: ignore it
+  // Every echo is ignored while a write is pending — the matching one included.
+  // Releasing the guard on the first match is what made fast clicking flip the
+  // control once: three quick picks (A, B, A) leave pending at A, the echo for
+  // the FIRST A matches it and clears the guard, and the B echo still in flight
+  // then repaints to B before the last A puts it back — one wrong frame, then
+  // right. An echo carries no sequence number saying which write it answers, so
+  // the guard cannot be released by inspecting one; it has to outlive the whole
+  // burst. The PENDING_MS timer, refreshed by every write, is what ends it once
+  // the clicking stops.
+  return true;
 }
 
 function send(payload) {
@@ -998,7 +1077,12 @@ function el(tag, cls, txt) {
    block redesign went from 280px panels to 440px, so every stored coordinate
    from before it packs panels on top of one another. Bumping this retires the
    old set rather than honouring coordinates that no longer fit. */
-const LAYOUT_VERSION = 2;
+// 3: the Movement and Anti-Aim panels grew a section intro and Movement gained a
+// slider, so every stored coordinate from v2 was measured against panels that no
+// longer exist at that height — the Settings panel came back on top of Movement.
+// Bumping discards them once; tidyPanels now WRITES the packed layout back, so
+// this should be the last bump needed for a height change.
+const LAYOUT_VERSION = 3;
 function panelPositionKey(tab) { return 'xrio.panelpos.v' + LAYOUT_VERSION + '.' + tab; }
 /* Which sections were left open. Re-injecting reset every panel to "first
    section expanded", so a section closed to get it out of the way came back
@@ -1112,7 +1196,6 @@ function buildLabel(ctrl) {
   top.appendChild(el('span', 'ctrl-row__name', ctrl.name));
   if (ctrl.risk) top.appendChild(el('span', 'ctrl-row__risk', 'RISK'));
   wrap.appendChild(top);
-  if (ctrl.desc) wrap.appendChild(el('div', 'ctrl-row__desc', ctrl.desc));
   return wrap;
 }
 
@@ -1121,6 +1204,7 @@ function buildToggle(ctrl) {
   // state. `risk` puts a wedge in the corner instead of a chip on the name
   // line, which keeps the name on one line at this tile width.
   const row  = el('div', 'ctrl-row toggle' + (ctrl.risk ? ' risk' : ''));
+  markDesc(row, ctrl);
   const pill = el('div', 'toggle__pill');   // renders ON/OFF via ::after
   row.appendChild(buildLabel(ctrl));
   row.appendChild(pill);
@@ -1155,8 +1239,10 @@ function buildSlider(ctrl) {
   const suffix = ctrl.suffix || '';
 
   const row   = el('div', 'ctrl-row slider');
+  markDesc(row, ctrl);
   const name  = el('div', 'ctrl-row__name', ctrl.name);
-  const desc  = ctrl.desc ? el('div', 'ctrl-row__desc', ctrl.desc) : null;
+  const desc  = null;
+  if (ctrl.desc) { /* text lives on the row; see tipShow */ }
   const track = el('div', 'slider__track');
   const fill  = el('div', 'slider__fill');
   const thumb = el('div', 'slider__thumb');
@@ -1198,6 +1284,14 @@ function buildSlider(ctrl) {
     const v = valueAt(ev.clientX);
     flags[ctrl.flag] = v;
     update(v);
+    // A drag emits a burst of throttled sends, and their echoes arrive one value
+    // behind. draggingFlag hides them mid-drag but is cleared the instant the
+    // mouse lifts, so a laggard echo landing just after release repainted the
+    // thumb at an old value — the same replay the toggles and dropdowns had, and
+    // the reason a slider dragged to 0.90 snapped back. Marking the displayed
+    // value pending makes every echo that disagrees stale until the one for what
+    // was actually asked arrives, which is last on an ordered socket.
+    markPending(ctrl.flag, v);
     sendThrottled(ctrl.flag, v);
   };
   const onUp = (ev) => {
@@ -1207,6 +1301,7 @@ function buildSlider(ctrl) {
     const v = valueAt(ev.clientX);
     flags[ctrl.flag] = v;
     update(v);
+    markPending(ctrl.flag, v);                            // hold the released value
     send({ type: 'set_flag', flag: ctrl.flag, value: v }); // final commit, unthrottled
     draggingFlag = null;
   };
@@ -1226,6 +1321,7 @@ function buildSlider(ctrl) {
 
 function buildKeybind(ctrl) {
   const row  = el('div', 'ctrl-row keybind' + (ctrl.desc ? ' has-desc' : ''));
+  markDesc(row, ctrl);
   const name = buildLabel(ctrl);
   const chip = el('div', 'keybind__chip', ctrl.default || 'None');
   row.appendChild(name);
@@ -1274,6 +1370,7 @@ const SEGMENT_MAX_CHARS   = 15;
 
 function buildSegmented(ctrl) {
   const row  = el('div', 'ctrl-row segmented' + (ctrl.desc ? ' has-desc' : ''));
+  markDesc(row, ctrl);
   const segs = el('div', 'segmented__group');
   row.appendChild(buildLabel(ctrl));
   row.appendChild(segs);
@@ -1315,6 +1412,7 @@ function buildDropdown(ctrl) {
   // The wrapper is the grid child, so it (not .dropdown) carries the span.
   const wrap = el('div', 'dropdown-wrap');
   const row  = el('div', 'ctrl-row dropdown' + (ctrl.desc ? ' has-desc' : ''));
+  markDesc(row, ctrl);
   const name = buildLabel(ctrl);
   const val  = el('div', 'dropdown__value', '');
   const chev = el('div', 'dropdown__chev');
@@ -1383,6 +1481,39 @@ const BUILDERS = {
 /* ==========================================================================
    PANEL ASSEMBLY
    ========================================================================== */
+
+// One tooltip element, positioned on hover. Delegation rather than a listener
+// per row: rows are rebuilt whenever the schema changes, and per-row listeners
+// were how the last leak started.
+function markDesc(row, ctrl) {
+  if (row && ctrl && ctrl.desc) { row.dataset.desc = ctrl.desc; row.classList.add('has-desc'); }
+  return row;
+}
+let _tipEl = null;
+function tipShow(row, ev) {
+  const text = row && row.dataset && row.dataset.desc;
+  if (!text) return;
+  if (!_tipEl) { _tipEl = el('div', null, ''); _tipEl.id = 'tip'; document.body.appendChild(_tipEl); }
+  _tipEl.textContent = text;
+  _tipEl.classList.add('show');
+  const pad = 12;
+  const r = _tipEl.getBoundingClientRect();
+  let x = ev.clientX + 14, y = ev.clientY + 16;
+  if (x + r.width  > window.innerWidth  - pad) x = ev.clientX - r.width  - 14;
+  if (y + r.height > window.innerHeight - pad) y = ev.clientY - r.height - 12;
+  _tipEl.style.left = Math.max(pad, x) + 'px';
+  _tipEl.style.top  = Math.max(pad, y) + 'px';
+}
+function tipHide() { if (_tipEl) _tipEl.classList.remove('show'); }
+// Belt to the CSS braces: -webkit-user-drag is Blink/WebKit only and does not
+// stop images or links from dragging. Cancelling the event covers every case,
+// and is safe because no code in this page uses native drag and drop.
+document.addEventListener('dragstart', (ev) => ev.preventDefault());
+
+document.addEventListener('mousemove', (ev) => {
+  const row = ev.target.closest && ev.target.closest('[data-desc]');
+  if (row) tipShow(row, ev); else tipHide();
+});
 
 function groupBySection(controls) {
   const out = [];
@@ -1464,6 +1595,16 @@ function buildPanel(tab, controls, index, total) {
 
     secBody = el('div', sectionName ? 'section-body' : '');
     body.appendChild(secBody);
+    // Carried on whichever control the script listed first in the section, so
+    // the flat schema needs no new top-level shape to transport it.
+    const secNote = (g.items.find((c) => c.secdesc) || {}).secdesc;
+    if (secNote && divider) {
+      // Plain text on the header, shown by the shared tooltip. The **bold** and
+      // !!warn markers are for a rendered block; strip them rather than ship
+      // asterisks into a tooltip.
+      divider.dataset.desc = String(secNote).replace(/\*\*/g, '').replace(/^!!/gm, '\u26a0 ');
+      divider.classList.add('has-desc');
+    }
     if (g.items.length > FILTER_THRESHOLD) {
       secBody.appendChild(buildSectionFilter(secBody, g.items.length));
     }
@@ -1635,14 +1776,48 @@ function layoutIsBroken() {
   return false;
 }
 
-/* Lay every panel out again and forget the stored coordinates, so the tidy
-   survives the next injection instead of being undone by them. */
+/* Lay every panel out again and WRITE the result back.
+   This used to delete the stored coordinates instead. Clearing them does stop a
+   stale position from being restored, but it also means the next injection has
+   nothing to restore and packs from scratch — against whatever heights it can
+   measure at that instant — so the panels landed somewhere new every time. That
+   is the "UI jumps around on every inject" report. Saving the packed layout
+   makes it the new baseline: the arrangement that was correct a moment ago is
+   the one that comes back. */
 function tidyPanels() {
   packTargets = [...document.querySelectorAll('.panel')];
   packPanels();
   for (const panel of packTargets) {
-    try { localStorage.removeItem(panelPositionKey(panel.dataset.tab)); } catch {}
+    try {
+      localStorage.setItem(panelPositionKey(panel.dataset.tab), JSON.stringify({
+        left: panel.offsetLeft, top: panel.offsetTop,
+      }));
+    } catch {}
   }
+}
+
+/* Panels keep growing after the two fixed checks below: sections animate open
+   over 260ms, applyVisibility hides rows afterwards, and a schema that arrives
+   in a second message rebuilds rows again. A height that changes at t=2s used
+   to go unnoticed, which is how a panel ended up sitting on top of its
+   neighbour with nothing left to notice it.
+
+   Watch the panels instead of guessing when they settle, and act only when the
+   layout is actually broken — repacking on every section toggle would move
+   panels the user deliberately placed. */
+let _roTimer = null;
+const _panelRO = (typeof ResizeObserver === 'function') ? new ResizeObserver(() => {
+  clearTimeout(_roTimer);
+  _roTimer = setTimeout(() => {
+    if (document.querySelector('.panel.dragging')) return;   // never fight a drag
+    if (layoutIsBroken()) tidyPanels();
+  }, 160);
+}) : null;
+
+function observePanels() {
+  if (!_panelRO) return;
+  _panelRO.disconnect();
+  document.querySelectorAll('.panel').forEach((p) => _panelRO.observe(p));
 }
 
 function rebuildIfSchemaChanged() {
@@ -1651,6 +1826,7 @@ function rebuildIfSchemaChanged() {
   document.querySelectorAll('.empty-state, .gate').forEach(n => n.remove());
   renderStatusbar();    // ensure status bar exists
   renderLoaderCard();   // and the inject one-liner card
+  syncLoaderCard();     // stow it once Lua is up — it is done at that point
 
   if (!luaConnected || schema.length === 0) {
     renderEmptyConnected();
@@ -1704,6 +1880,7 @@ function rebuildIfSchemaChanged() {
   setTimeout(() => {
     packPanels();                 // once more, in case that frame was busy
     if (layoutIsBroken()) tidyPanels();
+    observePanels();              // and from here on, react to real height changes
   }, 1100);
 
   // A rebuild throws away every row, so the collapse summaries go with them.
@@ -1880,7 +2057,7 @@ function renderGate() {
   // xrio is free. A key still exists per person because broker sessions are
   // keyed by it \u2014 sharing one key would make users boot each other offline.
   g.appendChild(el('div', 'gate__divider', 'OR'));
-  const claim = el('button', 'gate__alt', 'Get a free key');
+  const claim = el('button', 'gate__alt', 'Redeem invite');
   g.appendChild(claim);
   const note = el('div', 'gate__note',
     'Free forever. Your key is saved in this browser \u2014 keep it if you want the same session back.');
@@ -1902,8 +2079,12 @@ function renderGate() {
     claim.disabled = true;
     claim.textContent = 'Creating\u2026';
     try {
+      // Signup needs an invite code now — keys stopped being self-serve.
+      const code = (prompt('Invite code:', '') || '').trim();
+      if (!code) throw new Error('an invite code is required');
       const nm  = (prompt('Pick a name (so you can spot your session):', '') || '').trim();
-      const res = await fetch(HTTP_BASE + '/api/signup?name=' + encodeURIComponent(nm),
+      const res = await fetch(HTTP_BASE + '/api/signup?name=' + encodeURIComponent(nm)
+                              + '&code=' + encodeURIComponent(code),
                               { cache: 'no-store' });
       const j   = await res.json();
       if (!res.ok || !j.key) throw new Error(j.error || ('HTTP ' + res.status));
@@ -1911,7 +2092,7 @@ function renderGate() {
       setAccessKey(j.key);
     } catch (e) {
       claim.disabled = false;
-      claim.textContent = 'Get a free key';
+      claim.textContent = 'Redeem invite';
       note.textContent = 'Could not create a key: ' + e.message;
     }
   });
@@ -1926,32 +2107,53 @@ function renderLoaderCard() {
   // ..tick() runs at injection time, keeping the URL unique per run — executors
   // cache HttpGet by URL and ignore Cache-Control.
   const oneLiner =
-    `_G._XRIO_KEY="${ACCESS_KEY}";loadstring(game:HttpGet("${HTTP_BASE}/loader.lua?v="..tick()))()`;
+    `_G._XRIO_KEY="${ACCESS_KEY}";loadstring(game:HttpGet("${HTTP_BASE}/loader.lua?key=${ACCESS_KEY}&v="..tick()))()`;
   const card = el('div', 'loader-card');
   const head = el('div', 'loader-card__head');
+  head.appendChild(el('div', 'loader-card__dot'));
   head.appendChild(el('span', null, 'Inject in Roblox'));
   const closeBtn = el('button', 'loader-card__close', '\u00d7');
   closeBtn.title = 'hide (re-show by reopening the page)';
-  closeBtn.onclick = () => card.classList.add('collapsed');
+  closeBtn.onclick = () => { loaderCardDismissed = true; card.classList.add('collapsed'); };
   head.appendChild(closeBtn);
   card.appendChild(head);
+
+  const row  = el('div', 'loader-card__row');
   const code = el('code', 'loader-card__code', oneLiner);
-  card.appendChild(code);
-  const hint = el('div', 'loader-card__hint', 'click code to copy');
-  card.appendChild(hint);
-  const signout = el('div', 'loader-card__signout');
-  const a = el('a', null, 'sign out (clear saved key)');
+  code.title = oneLiner;
+  const copy = el('button', 'loader-card__copy', 'COPY');
+  row.appendChild(code); row.appendChild(copy);
+  card.appendChild(row);
+
+  const foot = el('div', 'loader-card__foot');
+  foot.appendChild(el('span', null, 'key ' + ACCESS_KEY.slice(0, 12) + '\u2026'));
+  const a = el('a', null, 'sign out');
   a.onclick = clearAccessKey;
-  signout.appendChild(a);
-  card.appendChild(signout);
-  code.addEventListener('click', () => {
+  foot.appendChild(a);
+  card.appendChild(foot);
+
+  const doCopy = () => {
     navigator.clipboard.writeText(oneLiner).then(() => {
-      hint.classList.add('copied');
-      hint.textContent = '\u2713 copied \u2014 paste in your executor';
-      setTimeout(() => { hint.classList.remove('copied'); hint.textContent = 'click code to copy'; }, 2500);
-    }).catch(() => { hint.textContent = 'press Ctrl+C to copy'; });
-  });
+      copy.classList.add('done');
+      copy.textContent = '\u2713 COPIED';
+      setTimeout(() => { copy.classList.remove('done'); copy.textContent = 'COPY'; }, 2000);
+    }).catch(() => { copy.textContent = 'CTRL+C'; });
+  };
+  code.addEventListener('click', doCopy);
+  copy.addEventListener('click', doCopy);
   document.body.appendChild(card);
+  syncLoaderCard();
+}
+
+// The card exists to get you injected. Once Lua is connected and the schema has
+// arrived, it has done its job and is only covering controls, so it stows
+// itself. A manual close is remembered so this never re-opens it.
+let loaderCardDismissed = false;
+function syncLoaderCard() {
+  const card = document.querySelector('.loader-card');
+  if (!card) return;
+  const done = luaConnected && schema.length > 0;
+  card.classList.toggle('collapsed', loaderCardDismissed || done);
 }
 
 function renderEmptyConnected() {
